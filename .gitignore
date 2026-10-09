@@ -1,0 +1,34 @@
+# Variables de entorno
+.env
+.env.*
+
+# Dependencias y builds
+node_modules/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cobertura de tests
+coverage/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Python (Ruff y caches)
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# Especificacion y lista de tareas personal
+spec.md
+plan_implementacion.md
+Proyecto 2 - PSO.pdf

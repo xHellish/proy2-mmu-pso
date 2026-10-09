@@ -1,0 +1,11 @@
+{
+  "name": "mmu-simulator-pso",
+  "version": "0.1.0",
+  "description": "Simulador de paginacion de memoria (MMU) para el Proyecto 2 de Sistemas Operativos",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8080"
+  }
+}

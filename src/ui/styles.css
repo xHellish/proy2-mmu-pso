@@ -1,0 +1,18 @@
+/* Estilos base de la interfaz */
+body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 1rem;
+}
+
+#setup_form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 24rem;
+}
+
+#simulation_screen {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
