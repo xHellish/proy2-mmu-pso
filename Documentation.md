@@ -31,7 +31,28 @@ src/engine/
 src/ui/           Pantalla de preparación y de simulación
 ```
 
-Interfaz de algoritmo: `on_load(page)`, `on_access(page)`, `choose_victim(candidates, context)`.
+### MMU
+
+`create_mmu(algorithm)` devuelve `{ execute, get_metrics, get_pages, get_frames }`. Estado interno:
+
+- `frames`: 100 marcos, cada uno con la página que lo ocupa o `null`.
+- `pages`: todas las páginas existentes, en RAM o en disco.
+- `memory_map`: `ptr` a lista de páginas.
+- `symbol_table`: `pid` a conjunto de `ptr` del proceso.
+- `next_ptr`: contador global, nunca se reutiliza.
+
+`execute(operation)` ejecuta una operación completa. Reglas de reloj:
+
+| Operación | Efecto | Reloj |
+|---|---|---|
+| `new` | Crea `ceil(size/4096)` páginas en RAM y suma `páginas*4096 - size` a la fragmentación | +5 s por página, siempre fallo y thrashing |
+| `use` | Por cada página: hit si está en RAM, fallo si está en disco | +1 s por hit, +5 s por fallo (el fallo suma al thrashing) |
+| `delete` | Borra las páginas del `ptr` y resta su fragmentación | 0 |
+| `kill` | `delete` de todos los `ptr` del proceso y lo marca como terminado | 0 |
+
+### Interfaz de algoritmo
+
+Todo algoritmo expone `on_load(page, context)`, `on_access(page, context)`, `on_unload(page)` y `choose_victim(candidates, context)`. El `context` trae `operation_index`, el índice de la operación en curso (lo necesita OPT). La MMU asigna `loaded_at`, el marco y la dirección de disco; el algoritmo solo mantiene sus propios datos.
 
 ## Stack
 
@@ -40,12 +61,24 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 ## Pendiente
 
 - Generador y botón de descarga en la UI.
-- MMU, reloj y métricas.
-- Algoritmos FIFO, SC, LRU, LFU y OPT.
+- Algoritmos SC, LRU, LFU y OPT (FIFO ya está).
 - UI de preparación y de simulación.
-- Implementar en el motor las reglas ya decididas (ver Decision Log): autodesalojo en `ptr` de más de 100 páginas, desempate y reinicio de `freq` en LFU, y columna MARK solo para SC.
+- Aplicar en LFU y SC las reglas ya decididas (ver Decision Log): desempate y reinicio de `freq`, y columna MARK solo para SC.
 
 ## Decision Log
+
+### 2026-10-10 - Diseño de la MMU y de la interfaz de algoritmos
+
+- La MMU es la misma para todos los algoritmos. Solo cambia la estrategia que recibe en `create_mmu`.
+- Interfaz de algoritmo: `on_load`, `on_access`, `on_unload` y `choose_victim`. Se agregó `on_unload` porque una página sale de RAM por desalojo y también por `delete` o `kill`, y un algoritmo con cola propia (SC) necesita enterarse en ambos casos.
+- Una carga desde disco o una página nueva llama a `on_load` y no a `on_access`: cargar ya cuenta como el acceso.
+- `loaded_at` es el reloj después de cobrar el fallo. Como cada carga cuesta al menos 5 s, nunca hay dos iguales.
+- Los candidatos a víctima son todas las páginas en RAM. La página que se está cargando aún no está en RAM, así que no puede ser elegida.
+- La dirección de disco (`disk_addr`) es un contador incremental que se asigna al desalojar y se borra al volver a RAM.
+- El `ptr` de un `new` se compara con `next_ptr` antes de modificar el estado, para que un error no deje páginas a medias.
+- Páginas cargadas y descargadas son conteos actuales, no acumulados, como en el Anexo 2 (RAM KB = cargadas por 4).
+- V-RAM se mide como porcentaje de la RAM, así que puede pasar de 100 %.
+- `kill` de un proceso que nunca pidió memoria se acepta y no hace nada, salvo marcarlo como terminado.
 
 ### 2026-10-10 - Parser tolerante en el formato y estricto en las reglas
 
