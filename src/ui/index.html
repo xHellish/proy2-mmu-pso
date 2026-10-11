@@ -1,32 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MMU Simulator</title>
+    <title>Simulador de MMU</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <!-- Pantalla de preparacion -->
-    <section id="setup_screen">
-      <h1>MMU Simulator</h1>
+    <section id="setup_screen" class="screen setup">
+      <h1>Simulador de MMU</h1>
+      <p class="subtitle">
+        Compara el algoritmo óptimo (OPT) contra un algoritmo de reemplazo de páginas sobre la
+        misma secuencia de operaciones.
+      </p>
       <form id="setup_form">
-        <label>Seed <input id="seed_input" type="number" value="1" /></label>
-        <label>Algorithm <select id="algorithm_select"></select></label>
-        <label>Processes (P) <select id="process_count_select"></select></label>
-        <label>Operations (N) <select id="operation_count_select"></select></label>
-        <label>Operations file <input id="file_input" type="file" accept=".txt" /></label>
-        <button id="download_button" type="button">Download file</button>
-        <button id="start_button" type="submit">Start</button>
+        <label for="seed_input">Semilla <input id="seed_input" type="text" inputmode="numeric" value="1" /></label>
+        <label for="algorithm_select">Algoritmo <select id="algorithm_select"></select></label>
+        <label for="process_count_select">Procesos (P) <select id="process_count_select"></select></label>
+        <label for="operation_count_select">Operaciones (N) <select id="operation_count_select"></select></label>
+        <label for="file_input">Archivo de operaciones (opcional) <input id="file_input" type="file" accept=".txt,text/plain" /></label>
+        <p id="file_status" class="hint"></p>
+        <button id="clear_file_button" type="button" class="secondary">Quitar archivo</button>
+        <p id="setup_error" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="download_button" type="button" class="secondary">Descargar archivo</button>
+          <button id="start_button" type="submit">Iniciar</button>
+        </div>
       </form>
     </section>
 
-    <!-- Pantalla de simulacion -->
-    <section id="simulation_screen" hidden>
-      <div id="controls"></div>
-      <div id="panel_opt"></div>
-      <div id="panel_selected"></div>
-    </section>
+    <!-- Pantalla de simulacion, se construye desde simulation_screen.js -->
+    <section id="simulation_screen" class="screen simulation" hidden></section>
 
     <script type="module" src="main.js"></script>
   </body>

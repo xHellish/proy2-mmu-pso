@@ -25,11 +25,32 @@ src/engine/
   rng.js          PRNG con semilla (mulberry32)
   parser.js       Archivo -> lista de operaciones
   generator.js    (seed, P, N) -> lista de operaciones válida
+  scenario.js     Datos de la pantalla de preparación -> escenario (operaciones + algoritmo)
   mmu.js          MMU genérica que recibe un algoritmo
   simulator.js    Corre 2 MMU coordinadas, una operación por paso
   algorithms/     fifo, sc, lru, lfu, opt
-src/ui/           Pantalla de preparación y de simulación
+src/ui/
+  index.html, styles.css
+  main.js               Une las dos pantallas y lee los valores de la URL
+  setup_screen.js       Formulario: semilla, algoritmo, P, N, archivo y descarga
+  simulation_screen.js  Controles y ciclo de ejecución con requestAnimationFrame
+  panel.js              Panel de una MMU: barra de RAM, tabla e indicadores
+  virtual_table.js      Tabla que solo dibuja las filas visibles
+  format.js, colors.js, dom.js   Textos, colores por PID y utilidades del DOM
 ```
+
+Lo que no toca el DOM (`simulator.js`, `scenario.js`, `format.js`, el cálculo de filas visibles de `virtual_table.js` y `colors.js`) tiene tests con `node:test`. El código del DOM se verificó abriendo la página en un navegador.
+
+### Simulador coordinado
+
+`create_simulator(algorithm_name, operations)` crea dos MMU, una con OPT y otra con el algoritmo elegido, y avanza una operación en ambas por paso (`step`, `step_many`). Cada MMU tiene su propio reloj. `get_snapshot()` devuelve una copia del estado de ambas (métricas, páginas y marcos), la operación más reciente y el progreso, así que un paso posterior nunca cambia una foto anterior.
+
+### Interfaz
+
+- **Preparación**: semilla, algoritmo (FIFO, SC, LRU, LFU), P, N y archivo opcional. Con un archivo cargado se ignoran semilla, P y N, y se avisa de cualquier error del archivo antes de iniciar. "Descargar archivo" baja el archivo generado en el formato del Anexo 1.
+- **Simulación**: dos paneles lado a lado, OPT a la izquierda. Cada panel tiene la barra de RAM de 100 celdas coloreadas por PID, la tabla de la MMU (PAGE ID, PID, LOADED, L-ADDR, M-ADDR, D-ADDR, LOADED-T, MARK) y los indicadores del enunciado, más hits y fallos.
+- **Controles**: Pausar/Reanudar, Paso, Ir al final y velocidad (1 a 2000 operaciones por segundo). Al terminar, el mensaje explica por qué la memoria quedó vacía: el generador termina cada proceso con `kill`.
+- **URL**: se puede abrir un escenario repetible con `?seed=1&algorithm=LRU&p=10&n=500&autostart=1`. Sirve para repetir una corrida o tomar las capturas del informe.
 
 ### MMU
 
@@ -81,11 +102,30 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 
 ## Pendiente
 
-- Botón de descarga del archivo generado en la UI.
-- UI de preparación y de simulación.
-- Mostrar la columna MARK solo para SC en la UI (el motor ya mantiene `ref_bit`).
+- Pruebas de carga y casos borde (Fase 6), entrega técnica (Fase 7) e informe (Fase 8).
 
 ## Decision Log
+
+### 2026-10-11 - Interfaz y mensajes de error en español
+
+- Toda la interfaz está en español: etiquetas, botones, estados, indicadores, ayudas y el nombre del archivo descargado (`operaciones_semilla5_P10_N500.txt`).
+- Los mensajes de error del motor (parser, validador, generador, escenario, MMU y algoritmos) también están en español, porque el usuario los ve en pantalla cuando un archivo tiene errores.
+- Los encabezados de la tabla de la MMU (PAGE ID, PID, LOADED, L-ADDR, M-ADDR, D-ADDR, LOADED-T, MARK) y los términos RAM, V-RAM, MMU y Thrashing se dejan como en el Anexo 2 del enunciado, para que quien corrija pueda compararlos directamente.
+- El código y los nombres de pruebas siguen en inglés; los comentarios, en español.
+- El mensaje final de la simulación explica que la memoria quedó vacía porque todos los procesos terminaron con `kill`. Es el comportamiento esperado, pero se veía como un fallo.
+
+### 2026-10-11 - Diseño de la interfaz
+
+- La interfaz usa JavaScript y DOM nativos, sin dependencias. La tabla de la MMU se virtualiza a mano, porque con 5000 operaciones puede haber miles de páginas (868 con P=100 a mitad de una corrida) y solo se dibujan unas 40 filas.
+- La simulación avanza con `requestAnimationFrame` y se dibuja una vez por cuadro, sin importar cuántas operaciones se ejecuten en él. La velocidad se reparte por tiempo transcurrido, con un tope de 2000 operaciones por cuadro para que una pestaña inactiva no congele la página al volver.
+- La tabla y los demás elementos se arman con `createElement` y `textContent`, no con `innerHTML`, para que ningún dato del archivo del usuario se interprete como HTML.
+- Los errores no se silencian: un archivo inválido o un error durante la simulación se muestran en pantalla con el mensaje del motor y también en la consola.
+- La simulación arranca corriendo a 10 operaciones por segundo. "Run to end" y "Step" pausan antes de actuar.
+- La columna MARK muestra el bit de referencia solo con SC y `-` en los demás, como se decidió antes. Las páginas en disco se muestran atenuadas en la tabla.
+- La V-RAM se muestra como porcentaje de la RAM, por lo que puede pasar de 100 %, como en el ejemplo del enunciado (125 %).
+- Se agregaron hits y fallos a los indicadores. El enunciado no los pide, pero ayudan a comparar algoritmos en el informe.
+- Los parámetros de la URL permiten repetir un escenario y tomar capturas sin pasar por el formulario.
+- Se probó en Firefox: la carga máxima (P=100, N=5000) corre completa, la descarga coincide con lo que produce el generador, un archivo inválido muestra el error de la operación exacta y con el Anexo 1 ambas MMU terminan en 28 s.
 
 ### 2026-10-11 - Parámetros del generador
 

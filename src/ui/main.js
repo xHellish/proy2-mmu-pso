@@ -2,47 +2,64 @@
 // Imports
 // ---------------------------------------------
 
-import {
-  VALID_ALGORITHMS,
-  VALID_PROCESS_COUNTS,
-  VALID_OPERATION_COUNTS,
-} from "../engine/types.js";
+import { create_setup_screen } from "./setup_screen.js";
+import { create_simulation_screen } from "./simulation_screen.js";
 
 // =============================================
-// Funciones
+// Pantallas
 // ---------------------------------------------
 
-// Llena un select con las opciones recibidas
-function fill_select(select_id, options) {
-  // Paso 1: buscar el select
-  const select = document.getElementById(select_id);
-  if (select === null) {
-    throw new Error(`Select not found: ${select_id}`);
-  }
+const setup_element = document.getElementById("setup_screen");
+const simulation_element = document.getElementById("simulation_screen");
 
-  // Paso 2: agregar una opcion por valor
-  for (const option_value of options) {
-    const option = document.createElement("option");
-    option.value = option_value;
-    option.textContent = option_value;
-    select.appendChild(option);
+// Muestra la pantalla de preparacion y oculta la de simulacion
+function show_setup() {
+  simulation_element.hidden = true;
+  setup_element.hidden = false;
+}
+
+// Pasa a la pantalla de simulacion con el escenario elegido
+function handle_start(scenario) {
+  // Paso 1: crear primero la simulacion; si falla, el error vuelve a la pantalla de preparacion
+  simulation_screen.start(scenario);
+
+  // Paso 2: solo si salio bien, cambiar de pantalla
+  setup_element.hidden = true;
+  simulation_element.hidden = false;
+}
+
+const simulation_screen = create_simulation_screen(simulation_element, show_setup);
+const setup_screen = create_setup_screen(handle_start);
+
+// =============================================
+// Valores desde la URL
+// ---------------------------------------------
+
+// Lee un entero de la URL; devuelve undefined si no esta o no es un entero
+function read_integer_param(params, name) {
+  const raw_value = params.get(name);
+  if (raw_value === null || !/^-?\d+$/.test(raw_value)) {
+    return undefined;
+  }
+  return Number(raw_value);
+}
+
+// Permite abrir un escenario repetible, por ejemplo ?seed=1&algorithm=LRU&p=10&n=500&autostart=1
+function apply_url_preset() {
+  const params = new URLSearchParams(window.location.search);
+  let algorithm_name = params.get("algorithm");
+  if (algorithm_name !== null) {
+    algorithm_name = algorithm_name.toUpperCase();
+  }
+  setup_screen.apply_preset({
+    seed: read_integer_param(params, "seed"),
+    algorithm_name: algorithm_name,
+    process_count: read_integer_param(params, "p"),
+    operation_count: read_integer_param(params, "n"),
+  });
+  if (params.get("autostart") === "1") {
+    setup_screen.submit();
   }
 }
 
-// Maneja el envio del formulario de preparacion
-function handle_start(event) {
-  // Paso 1: evitar que el formulario recargue la pagina
-  event.preventDefault();
-
-  // Paso 2: pendiente de implementar
-  console.log("Simulation start is not implemented yet");
-}
-
-// =============================================
-// Inicio
-// ---------------------------------------------
-
-fill_select("algorithm_select", VALID_ALGORITHMS);
-fill_select("process_count_select", VALID_PROCESS_COUNTS);
-fill_select("operation_count_select", VALID_OPERATION_COUNTS);
-document.getElementById("setup_form").addEventListener("submit", handle_start);
+apply_url_preset();
