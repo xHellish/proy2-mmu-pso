@@ -8,6 +8,9 @@ export const HIT_COST_SECONDS = 1;
 export const FAULT_COST_SECONDS = 5;
 export const THRASHING_ALERT_RATIO = 0.5;
 
+// Tope de paginas por ptr (400 MB): evita que un tamano absurdo congele la simulacion
+export const MAX_PAGES_PER_PTR = 100000;
+
 // =============================================
 // Valores permitidos
 // ---------------------------------------------
@@ -32,12 +35,13 @@ export function create_operation(type, pid, ptr, size) {
   return { type, pid, ptr, size };
 }
 
-// Crea una pagina nueva con los datos que necesitan todos los algoritmos
-export function create_page(id, pid, ptr) {
+// Crea una pagina nueva con los datos que necesitan todos los algoritmos; index es su posicion en el ptr
+export function create_page(id, pid, ptr, index = 0) {
   return {
     id,
     pid,
     ptr,
+    index,
     in_ram: false,
     frame: null,
     disk_addr: null,

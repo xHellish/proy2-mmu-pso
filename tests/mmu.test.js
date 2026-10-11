@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { create_mmu } from "../src/engine/mmu.js";
 import { create_fifo_algorithm } from "../src/engine/algorithms/fifo.js";
-import { RAM_PAGES, PAGE_SIZE_BYTES, create_operation } from "../src/engine/types.js";
+import { RAM_PAGES, PAGE_SIZE_BYTES, MAX_PAGES_PER_PTR, create_operation } from "../src/engine/types.js";
 
 // =============================================
 // Datos de prueba
@@ -213,8 +213,32 @@ test("new of more than 100 pages evicts its own pages", () => {
 test("new rejects an invalid size", () => {
   const mmu = create_mmu(create_fifo_algorithm());
 
-  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 0)), /Tamaño inválido para new/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, -1)), /Tamaño inválido para new/);
   assert.throws(() => mmu.execute(create_operation("new", 1, 1, 2.5)), /Tamaño inválido para new/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, NaN)), /Tamaño inválido para new/);
+});
+
+test("new of size 0 creates a ptr without pages", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+
+  const ptr = mmu.execute(create_operation("new", 1, 1, 0));
+  const metrics = mmu.get_metrics();
+
+  assert.equal(ptr, 1);
+  assert.equal(mmu.get_pages().length, 0);
+  assert.equal(metrics.clock_seconds, 0);
+  assert.equal(metrics.fragmentation_bytes, 0);
+  assert.equal(metrics.active_processes, 1);
+  assert.doesNotThrow(() => mmu.execute(create_operation("use", 1, 1, null)));
+  assert.doesNotThrow(() => mmu.execute(create_operation("delete", 1, 1, null)));
+});
+
+test("new rejects a size that needs more pages than the maximum", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  const too_big = (MAX_PAGES_PER_PTR + 1) * PAGE_SIZE_BYTES;
+
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, too_big)), /el máximo permitido es 100000/);
+  assert.equal(mmu.get_pages().length, 0);
 });
 
 test("new rejects an operation whose ptr does not match the assigned one", () => {

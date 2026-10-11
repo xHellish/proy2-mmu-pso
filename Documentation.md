@@ -90,11 +90,11 @@ Falla con error explícito si N es menor que `2 * P`, porque cada proceso necesi
 | SC | Cola FIFO; con `ref_bit` 1 lo pone en 0 y manda la página al final | `ref_bit` (columna MARK) y una cola propia |
 | LRU | Menor `last_use` | Contador de accesos propio, no el reloj |
 | LFU | Menor `freq`; empate: menor `loaded_at` y luego menor id | `freq` |
-| OPT | `ptr` con el siguiente `use` más lejano; sin usos futuros cuenta como infinito; empate: menor `loaded_at` y luego menor id | Lista de operaciones completa, `operation_index` del contexto |
+| OPT | Página cuyo siguiente acceso (operación y posición dentro del `ptr`) está más lejos; sin accesos futuros cuenta como infinito; empate: menor `loaded_at` y luego menor id | Lista de operaciones completa, `operation_index` y `page_index` del contexto |
 
 ### Interfaz de algoritmo
 
-Todo algoritmo expone `on_load(page, context)`, `on_access(page, context)`, `on_unload(page)` y `choose_victim(candidates, context)`. El `context` trae `operation_index`, el índice de la operación en curso (lo necesita OPT). La MMU asigna `loaded_at`, el marco y la dirección de disco; el algoritmo solo mantiene sus propios datos.
+Todo algoritmo expone `on_load(page, context)`, `on_access(page, context)`, `on_unload(page)` y `choose_victim(candidates, context)`. El `context` trae `operation_index`, el índice de la operación en curso, y, al elegir víctima, `page_index`, la posición dentro de su `ptr` de la página que se está cargando (los dos los necesita OPT). Cada página guarda su posición en `index`. La MMU asigna `loaded_at`, el marco y la dirección de disco; el algoritmo solo mantiene sus propios datos.
 
 ## Stack
 
@@ -102,9 +102,19 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 
 ## Pendiente
 
-- Pruebas de carga y casos borde (Fase 6), entrega técnica (Fase 7) e informe (Fase 8).
+- Entrega técnica (Fase 7) e informe (Fase 8).
 
 ## Decision Log
+
+### 2026-10-11 - Fase 6: OPT por página, casos borde y límites
+
+- OPT mide la distancia por página y no por `ptr`. La clave de cada página es la operación de su siguiente acceso y su posición dentro del `ptr`. Un `use` recorre las páginas en orden, así que dentro de un mismo `ptr` la más lejana es la de mayor posición. Dentro de un `use` en curso, las páginas del `ptr` que aún no se recorren cuentan como acceso inmediato.
+- Motivo: con la regla anterior, las páginas de un mismo `ptr` empataban y se desempataba como FIFO, así que un bloque de más de 100 páginas daba los mismos 202 fallos que FIFO. El óptimo real son 102: 101 al crearlo y 1 en el `use`. Con `new(1,410000)`, `use(1)`, `kill(1)`, OPT queda en 610 s y los demás algoritmos en 1010 s.
+- La MMU pasa `page_index` en el contexto al elegir víctima, y cada página guarda su posición en `index`.
+- Un `new` de tamaño 0 crea un `ptr` sin páginas (0 s y sin fragmentación) y el PID 0 es válido. El enunciado no los excluye, y un archivo de pruebas no debería rechazarse por eso.
+- Un `ptr` puede tener como máximo 100 000 páginas (400 MB). Un tamaño mayor se rechaza con un error que indica la operación, para que un valor absurdo no congele el navegador. No hay tope sobre el total de páginas.
+- Mediciones: con P=100 y N=5000 cada algoritmo corre en unos 100 ms en el navegador; el parser procesa 100 000 operaciones en menos de un segundo; un bloque de 100 000 páginas tarda cerca de 1 s por paso; la animación a 2000 operaciones por segundo termina las 5000 en 2,5 s.
+- Verificación: las pruebas de carga comparan la MMU contra un cálculo independiente (páginas totales, fragmentación y procesos activos) y revisan sus invariantes (marcos, direcciones de disco, reloj y métricas) después de cada operación. Cubren las nueve combinaciones de P y N, bloques de 99 a 1000 páginas y trazas aleatorias con bloques de más de 100 páginas.
 
 ### 2026-10-11 - Interfaz y mensajes de error en español
 
@@ -145,7 +155,7 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 - SC lanza un error explícito si su cola no coincide con las páginas en RAM, en vez de decidir con datos inconsistentes.
 - Consecuencia: con todas las páginas recién cargadas (bit 1), el primer desalojo de SC se comporta como FIFO. Se diferencia cuando hay accesos entre desalojos.
 - LRU usa un contador de accesos propio y no el reloj, porque un `new` de varias páginas avanza el reloj de a 5 s pero un contador nunca empata.
-- OPT mira la distancia por `ptr`, no por página. Las páginas de un mismo `ptr` empatan y se desempata como FIFO. Esa regla se usa para cualquier empate, no solo dentro del mismo `ptr`.
+- OPT mide la distancia por página (ver la entrada de la Fase 6). Todo empate se resuelve como FIFO.
 - OPT necesita que la MMU ejecute las operaciones en orden desde el índice 0, porque compara `operation_index` con las posiciones de la lista que recibió al crearse.
 - Un `ptr` que se borra antes de volver a usarse no necesita caso aparte: la validación del parser impide un `use` posterior, así que ya no tiene usos futuros.
 - Comprobación: sobre 10 semillas de 600 operaciones, OPT nunca tiene más fallos, tiempo ni thrashing que FIFO, SC, LRU o LFU.

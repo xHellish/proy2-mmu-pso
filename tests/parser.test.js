@@ -150,9 +150,21 @@ test("rejects a second kill of the same process", () => {
   assert.throws(() => parse_operations(text), /el proceso 1 ya terminó con kill/);
 });
 
-test("rejects zero as pid or size", () => {
-  assert.throws(() => parse_operations("new(0,10)"), /el pid debe ser un entero positivo/);
-  assert.throws(() => parse_operations("new(1,0)"), /el tamaño debe ser un entero positivo/);
+test("accepts 0 as pid and as size", () => {
+  const operations = parse_operations("new(0,0)\nuse(1)\nkill(0)");
+
+  assert.equal(operations.length, 3);
+  assert.equal(operations[0].pid, 0);
+  assert.equal(operations[0].size, 0);
+});
+
+test("rejects a size that needs more pages than the maximum", () => {
+  assert.throws(() => parse_operations("new(1,409600001)"), /necesita 100001 páginas, el máximo permitido es 100000/);
+  assert.doesNotThrow(() => parse_operations("new(1,409600000)\nkill(1)"));
+});
+
+test("rejects an absurdly large size without freezing", () => {
+  assert.throws(() => parse_operations("new(1,99999999999999999999)"), /el máximo permitido es 100000/);
 });
 
 test("validate rejects a use with the wrong owner pid", () => {

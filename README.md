@@ -2,7 +2,7 @@
 
 Simulador de paginación de memoria para el Proyecto 2 de Sistemas Operativos. Compara el algoritmo óptimo (OPT) contra FIFO, Second Chance (SC), LRU o LFU sobre la misma secuencia de operaciones.
 
-> Estado: en desarrollo. Ya funcionan el motor (parser, generador con semilla, MMU y los cinco algoritmos) y la interfaz de simulación. Faltan pruebas de carga, el despliegue y el informe.
+> Estado: en desarrollo. Ya funcionan el motor (parser, generador con semilla, MMU y los cinco algoritmos) y la interfaz de simulación. Faltan el despliegue y el informe.
 
 ## Stack
 

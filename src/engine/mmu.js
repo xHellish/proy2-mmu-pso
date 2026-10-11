@@ -7,6 +7,7 @@ import {
   RAM_PAGES,
   HIT_COST_SECONDS,
   FAULT_COST_SECONDS,
+  MAX_PAGES_PER_PTR,
   create_page,
 } from "./types.js";
 
@@ -127,7 +128,7 @@ export function create_mmu(algorithm) {
     // Paso 2: si la RAM esta llena, elegir una victima entre todas las paginas en RAM
     if (frame_index === null) {
       const candidates = get_ram_pages();
-      const victim = algorithm.choose_victim(candidates, context);
+      const victim = algorithm.choose_victim(candidates, { ...context, page_index: page.index });
       if (!candidates.includes(victim)) {
         throw new Error("El algoritmo eligió una página víctima que no está en RAM");
       }
@@ -156,8 +157,13 @@ export function create_mmu(algorithm) {
     if (killed_pids.has(pid)) {
       throw new Error(`El proceso ${pid} ya terminó con kill, no puede pedir memoria`);
     }
-    if (!Number.isInteger(size) || size < 1) {
+    if (!Number.isInteger(size) || size < 0) {
       throw new Error(`Tamaño inválido para new: ${size}`);
+    }
+    if (Math.ceil(size / PAGE_SIZE_BYTES) > MAX_PAGES_PER_PTR) {
+      throw new Error(
+        `El tamaño ${size} necesita ${Math.ceil(size / PAGE_SIZE_BYTES)} páginas, el máximo permitido es ${MAX_PAGES_PER_PTR}`,
+      );
     }
 
     // Paso 2: registrar al proceso y asignar el siguiente ptr, que nunca se reutiliza
@@ -181,7 +187,7 @@ export function create_mmu(algorithm) {
 
     // Paso 5: crear cada pagina en RAM; una pagina nueva siempre cuenta como fallo
     for (let page_index = 0; page_index < page_count; page_index++) {
-      const page = create_page(next_page_id, pid, ptr);
+      const page = create_page(next_page_id, pid, ptr, page_index);
       next_page_id++;
       pages.set(page.id, page);
       ptr_pages.push(page);

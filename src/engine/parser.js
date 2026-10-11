@@ -2,7 +2,7 @@
 // Imports
 // ---------------------------------------------
 
-import { create_operation, OPERATION_TYPES } from "./types.js";
+import { create_operation, OPERATION_TYPES, PAGE_SIZE_BYTES, MAX_PAGES_PER_PTR } from "./types.js";
 
 // =============================================
 // Constantes del formato
@@ -32,10 +32,20 @@ function parse_integer(raw_value, description, operation_number) {
   return Number(trimmed);
 }
 
-// Verifica que un valor sea un entero positivo o lanza un error con el contexto
-function assert_positive_integer(value, description, label) {
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`${label}: ${description} debe ser un entero positivo, se recibió ${value}`);
+// Verifica que un valor sea un entero no negativo o lanza un error con el contexto
+function assert_non_negative_integer(value, description, label) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label}: ${description} debe ser un entero no negativo, se recibió ${value}`);
+  }
+}
+
+// Verifica que el tamano no necesite mas paginas que el maximo permitido por ptr
+function assert_size_fits(size, label) {
+  const page_count = Math.ceil(size / PAGE_SIZE_BYTES);
+  if (page_count > MAX_PAGES_PER_PTR) {
+    throw new Error(
+      `${label}: el tamaño ${size} necesita ${page_count} páginas, el máximo permitido es ${MAX_PAGES_PER_PTR}`,
+    );
   }
 }
 
@@ -136,8 +146,9 @@ export function validate_operations(operations) {
 
     // Paso 2.1: new debe ser de un proceso vivo y traer el ptr secuencial
     if (operation.type === "new") {
-      assert_positive_integer(operation.pid, "el pid", label);
-      assert_positive_integer(operation.size, "el tamaño", label);
+      assert_non_negative_integer(operation.pid, "el pid", label);
+      assert_non_negative_integer(operation.size, "el tamaño", label);
+      assert_size_fits(operation.size, label);
       if (killed_pids.has(operation.pid)) {
         throw new Error(`${label}: el proceso ${operation.pid} ya terminó con kill`);
       }
@@ -151,7 +162,7 @@ export function validate_operations(operations) {
 
     // Paso 2.2: kill solo se puede usar una vez por proceso
     if (operation.type === "kill") {
-      assert_positive_integer(operation.pid, "el pid", label);
+      assert_non_negative_integer(operation.pid, "el pid", label);
       if (killed_pids.has(operation.pid)) {
         throw new Error(`${label}: el proceso ${operation.pid} ya terminó con kill`);
       }

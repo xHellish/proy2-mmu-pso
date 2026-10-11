@@ -157,10 +157,12 @@ test("in the MMU, OPT evicts the ptr with the farthest finite next use", () => {
   }
   const pages = mmu.get_pages();
 
-  // ptr 1 se usa en la op 4, ptr 2 en la 5 y ptr 3 (98 paginas) en la 6, el mas lejano: sale su pagina mas vieja
+  // ptr 1 se usa en la op 4, ptr 2 en la 5 y ptr 3 (98 paginas) en la 6, el mas lejano:
+  // dentro de ese ptr sale su ultima pagina, porque es la que se accede mas tarde en el use
   assert.equal(pages[0].in_ram, true);
   assert.equal(pages[1].in_ram, true);
-  assert.equal(pages[2].in_ram, false);
+  assert.equal(pages[2].in_ram, true);
+  assert.equal(pages[99].in_ram, false);
 });
 
 test("in the MMU, OPT runs the Annex 1 trace with the same clock as FIFO when nothing is evicted", () => {
@@ -187,4 +189,66 @@ test("in the MMU, OPT runs the Annex 1 trace with the same clock as FIFO when no
   assert.equal(metrics.clock_seconds, 28);
   assert.equal(metrics.page_hits, 8);
   assert.equal(metrics.page_faults, 4);
+});
+
+// =============================================
+// OPT con ptr de varias paginas
+// ---------------------------------------------
+
+// Crea una pagina en RAM con su posicion dentro del ptr
+function create_indexed_page(id, ptr, index, loaded_at) {
+  const page = create_ram_page(id, ptr, loaded_at);
+  page.index = index;
+  return page;
+}
+
+test("OPT evicts the last page of a ptr, because a use reaches it last", () => {
+  const opt = create_opt_algorithm([filler(), use_of(1)]);
+  const candidates = [
+    create_indexed_page(1, 1, 0, 5),
+    create_indexed_page(2, 1, 1, 10),
+    create_indexed_page(3, 1, 2, 15),
+  ];
+
+  assert.equal(opt.choose_victim(candidates, { operation_index: 0 }).id, 3);
+});
+
+test("OPT keeps the pages that the current use still has to reach", () => {
+  // En la operacion 0 se usa el ptr 1 y se esta cargando su pagina de posicion 1
+  const opt = create_opt_algorithm([use_of(1), use_of(1)]);
+  const candidates = [
+    create_indexed_page(1, 1, 0, 5),
+    create_indexed_page(3, 1, 2, 15),
+    create_indexed_page(4, 1, 3, 20),
+  ];
+
+  // La posicion 0 ya se accedio en esta operacion y no vuelve hasta la siguiente
+  assert.equal(opt.choose_victim(candidates, { operation_index: 0, page_index: 1 }).id, 1);
+});
+
+test("OPT frees the pages already reached when the ptr has no more uses", () => {
+  const opt = create_opt_algorithm([use_of(1)]);
+  const candidates = [
+    create_indexed_page(1, 1, 0, 5),
+    create_indexed_page(2, 1, 1, 10),
+    create_indexed_page(3, 1, 2, 15),
+  ];
+
+  // La pagina 0 ya se accedio y no hay mas usos: distancia infinita, gana el desempate FIFO
+  assert.equal(opt.choose_victim(candidates, { operation_index: 0, page_index: 1 }).id, 1);
+});
+
+test("in the MMU, OPT faults far less than FIFO on a ptr larger than the RAM", () => {
+  const text = "new(1,410000)\nuse(1)\nkill(1)";
+  const operations = parse_operations(text);
+  const opt_mmu = create_mmu(create_opt_algorithm(operations));
+  for (const operation of operations) {
+    opt_mmu.execute(operation);
+  }
+  const opt_metrics = opt_mmu.get_metrics();
+
+  // 101 paginas nuevas (fallos) y en el use solo falla la pagina 99, que OPT saco al cargar la 100
+  assert.equal(opt_metrics.page_faults, 102);
+  assert.equal(opt_metrics.page_hits, 100);
+  assert.equal(opt_metrics.clock_seconds, 102 * 5 + 100);
 });

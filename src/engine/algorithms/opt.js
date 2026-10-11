@@ -2,7 +2,7 @@
 // Algoritmo OPT
 // ---------------------------------------------
 
-// Crea el algoritmo OPT: desaloja la pagina cuyo ptr se vuelve a usar mas tarde
+// Crea el algoritmo OPT: desaloja la pagina que se vuelve a acceder mas tarde
 export function create_opt_algorithm(operations) {
   // Paso 1: validar la lista completa de operaciones, que OPT necesita para ver el futuro
   if (!Array.isArray(operations)) {
@@ -63,7 +63,47 @@ export function create_opt_algorithm(operations) {
     return uses[low];
   }
 
-  // Elige la pagina cuyo ptr se usa mas tarde; ante empate, la de menor loaded_at y luego menor id
+  // Devuelve cuando se vuelve a acceder la pagina: la operacion y su posicion dentro del ptr
+  function get_next_access(candidate, context) {
+    // Paso 1: en un use, las paginas del mismo ptr que van despues de la actual se acceden en esta misma operacion
+    const current = operations[context.operation_index];
+    if (
+      current !== undefined &&
+      current.type === "use" &&
+      current.ptr === candidate.ptr &&
+      Number.isInteger(context.page_index) &&
+      candidate.index > context.page_index
+    ) {
+      return { operation: context.operation_index, index: candidate.index };
+    }
+
+    // Paso 2: en cualquier otro caso, en el siguiente use del ptr, donde las paginas se acceden en orden
+    return { operation: get_next_use(candidate.ptr, context.operation_index), index: candidate.index };
+  }
+
+  // Indica si el primer acceso esta mas lejos en el futuro que el segundo; nunca es mas lejos si ambos son infinitos
+  function is_farther(first, second) {
+    if (first.operation !== second.operation) {
+      return first.operation > second.operation;
+    }
+    if (first.operation === Infinity) {
+      return false;
+    }
+    return first.index > second.index;
+  }
+
+  // Indica si dos accesos son del mismo momento (ambos infinitos o misma operacion y posicion)
+  function is_same_distance(first, second) {
+    if (first.operation !== second.operation) {
+      return false;
+    }
+    if (first.operation === Infinity) {
+      return true;
+    }
+    return first.index === second.index;
+  }
+
+  // Elige la pagina que se accede mas tarde; ante empate, la de menor loaded_at y luego menor id
   function choose_victim(candidates, context) {
     // Paso 1: validar candidatos y contexto
     if (candidates.length === 0) {
@@ -73,15 +113,15 @@ export function create_opt_algorithm(operations) {
       throw new Error("OPT necesita el operation_index actual en el contexto");
     }
 
-    // Paso 2: buscar la pagina con el siguiente uso mas lejano
+    // Paso 2: buscar la pagina con el siguiente acceso mas lejano
     let victim = candidates[0];
-    let victim_next_use = get_next_use(victim.ptr, context.operation_index);
+    let victim_access = get_next_access(victim, context);
     for (const candidate of candidates) {
-      const candidate_next_use = get_next_use(candidate.ptr, context.operation_index);
+      const candidate_access = get_next_access(candidate, context);
       let is_better = false;
-      if (candidate_next_use > victim_next_use) {
+      if (is_farther(candidate_access, victim_access)) {
         is_better = true;
-      } else if (candidate_next_use === victim_next_use) {
+      } else if (is_same_distance(candidate_access, victim_access)) {
         if (candidate.loaded_at < victim.loaded_at) {
           is_better = true;
         } else if (candidate.loaded_at === victim.loaded_at && candidate.id < victim.id) {
@@ -90,7 +130,7 @@ export function create_opt_algorithm(operations) {
       }
       if (is_better) {
         victim = candidate;
-        victim_next_use = candidate_next_use;
+        victim_access = candidate_access;
       }
     }
 
