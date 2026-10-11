@@ -6,7 +6,7 @@
 export function create_rng(seed) {
   // Paso 1: validar la semilla
   if (!Number.isInteger(seed)) {
-    throw new Error(`Seed must be an integer, received: ${seed}`);
+    throw new Error(`La semilla debe ser un entero, se recibió: ${seed}`);
   }
 
   // Paso 2: normalizar la semilla a 32 bits
@@ -26,7 +26,7 @@ export function create_rng(seed) {
 export function random_int(next_random, min, max) {
   // Paso 1: validar el rango
   if (min > max) {
-    throw new Error(`Invalid range: min ${min} is greater than max ${max}`);
+    throw new Error(`Rango inválido: el mínimo ${min} es mayor que el máximo ${max}`);
   }
 
   // Paso 2: escalar el numero al rango

@@ -21,7 +21,7 @@ function on_unload(page) {
 function choose_victim(candidates, context) {
   // Paso 1: debe haber al menos un candidato
   if (candidates.length === 0) {
-    throw new Error("LFU has no candidates to evict");
+    throw new Error("LFU no tiene candidatos para desalojar");
   }
 
   // Paso 2: buscar la pagina menos usada, desempatando como FIFO

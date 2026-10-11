@@ -55,5 +55,5 @@ test("FIFO breaks a tie with the lowest page id", () => {
 test("FIFO rejects an empty candidate list", () => {
   const fifo = create_fifo_algorithm();
 
-  assert.throws(() => fifo.choose_victim([], {}), /no candidates to evict/);
+  assert.throws(() => fifo.choose_victim([], {}), /no tiene candidatos para desalojar/);
 });

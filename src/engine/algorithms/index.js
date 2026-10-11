@@ -30,7 +30,7 @@ export function create_algorithm(name) {
   // Paso 1: buscar la fabrica del algoritmo
   const factory = ALGORITHM_FACTORIES[name];
   if (factory === undefined) {
-    throw new Error(`Unknown algorithm: ${name}`);
+    throw new Error(`Algoritmo desconocido: ${name}`);
   }
 
   // Paso 2: crear la instancia

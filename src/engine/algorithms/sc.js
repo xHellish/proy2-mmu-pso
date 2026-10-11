@@ -22,7 +22,7 @@ export function create_sc_algorithm() {
   function on_unload(page) {
     const queue_index = queue.indexOf(page);
     if (queue_index === -1) {
-      throw new Error(`SC cannot unload page ${page.id}: it is not in the queue`);
+      throw new Error(`SC no puede descargar la página ${page.id}: no está en la cola`);
     }
     queue.splice(queue_index, 1);
     page.ref_bit = 0;
@@ -32,11 +32,11 @@ export function create_sc_algorithm() {
   function choose_victim(candidates, context) {
     // Paso 1: la cola debe coincidir con las paginas en RAM
     if (candidates.length === 0) {
-      throw new Error("SC has no candidates to evict");
+      throw new Error("SC no tiene candidatos para desalojar");
     }
     if (queue.length !== candidates.length) {
       throw new Error(
-        `SC queue is out of sync: ${queue.length} queued pages and ${candidates.length} candidates`,
+        `La cola de SC está desincronizada: ${queue.length} páginas en cola y ${candidates.length} candidatas`,
       );
     }
 

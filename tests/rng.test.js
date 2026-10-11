@@ -36,9 +36,9 @@ test("random_int stays inside the range", () => {
 });
 
 test("create_rng rejects a non integer seed", () => {
-  assert.throws(() => create_rng("abc"), /Seed must be an integer/);
+  assert.throws(() => create_rng("abc"), /La semilla debe ser un entero/);
 });
 
 test("random_int rejects an invalid range", () => {
-  assert.throws(() => random_int(create_rng(1), 5, 1), /Invalid range/);
+  assert.throws(() => random_int(create_rng(1), 5, 1), /Rango inválido/);
 });

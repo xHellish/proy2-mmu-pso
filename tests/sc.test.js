@@ -90,7 +90,7 @@ test("SC rejects unloading a page that is not in the queue", () => {
   const sc = create_sc_algorithm();
   const stranger = create_page(9, 1, 1);
 
-  assert.throws(() => sc.on_unload(stranger), /not in the queue/);
+  assert.throws(() => sc.on_unload(stranger), /no está en la cola/);
 });
 
 test("SC detects a queue that is out of sync with the candidates", () => {
@@ -98,8 +98,8 @@ test("SC detects a queue that is out of sync with the candidates", () => {
   const page_1 = load_page_into(sc, 1);
   load_page_into(sc, 2);
 
-  assert.throws(() => sc.choose_victim([page_1], {}), /queue is out of sync/);
-  assert.throws(() => sc.choose_victim([], {}), /no candidates to evict/);
+  assert.throws(() => sc.choose_victim([page_1], {}), /desincronizada/);
+  assert.throws(() => sc.choose_victim([], {}), /no tiene candidatos para desalojar/);
 });
 
 // =============================================

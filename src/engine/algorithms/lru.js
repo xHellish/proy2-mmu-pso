@@ -32,7 +32,7 @@ export function create_lru_algorithm() {
   function choose_victim(candidates, context) {
     // Paso 1: debe haber al menos un candidato
     if (candidates.length === 0) {
-      throw new Error("LRU has no candidates to evict");
+      throw new Error("LRU no tiene candidatos para desalojar");
     }
 
     // Paso 2: buscar la pagina usada hace mas tiempo

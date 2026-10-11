@@ -25,7 +25,7 @@ export const OPERATION_TYPES = ["new", "use", "delete", "kill"];
 export function create_operation(type, pid, ptr, size) {
   // Paso 1: validar el tipo de operacion
   if (!OPERATION_TYPES.includes(type)) {
-    throw new Error(`Invalid operation type: ${type}`);
+    throw new Error(`Tipo de operación inválido: ${type}`);
   }
 
   // Paso 2: armar la operacion

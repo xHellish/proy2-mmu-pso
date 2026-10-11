@@ -78,7 +78,7 @@ test("each LRU instance has its own access counter", () => {
 test("LRU rejects an empty candidate list", () => {
   const lru = create_lru_algorithm();
 
-  assert.throws(() => lru.choose_victim([], {}), /no candidates to evict/);
+  assert.throws(() => lru.choose_victim([], {}), /no tiene candidatos para desalojar/);
 });
 
 // =============================================

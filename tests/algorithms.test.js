@@ -79,7 +79,7 @@ test("create_algorithm builds every algorithm the user can choose", () => {
 });
 
 test("create_algorithm rejects an unknown algorithm", () => {
-  assert.throws(() => create_algorithm("MRU"), /Unknown algorithm: MRU/);
+  assert.throws(() => create_algorithm("MRU"), /Algoritmo desconocido: MRU/);
 });
 
 test("every algorithm gives independent state per instance", () => {

@@ -6,7 +6,7 @@
 export function create_opt_algorithm(operations) {
   // Paso 1: validar la lista completa de operaciones, que OPT necesita para ver el futuro
   if (!Array.isArray(operations)) {
-    throw new Error("OPT requires the full list of operations");
+    throw new Error("OPT requiere la lista completa de operaciones");
   }
 
   // Paso 2: precalcular, por cada ptr, los indices de operacion donde aparece un use
@@ -67,10 +67,10 @@ export function create_opt_algorithm(operations) {
   function choose_victim(candidates, context) {
     // Paso 1: validar candidatos y contexto
     if (candidates.length === 0) {
-      throw new Error("OPT has no candidates to evict");
+      throw new Error("OPT no tiene candidatos para desalojar");
     }
     if (context === undefined || !Number.isInteger(context.operation_index)) {
-      throw new Error("OPT needs the current operation_index in the context");
+      throw new Error("OPT necesita el operation_index actual en el contexto");
     }
 
     // Paso 2: buscar la pagina con el siguiente uso mas lejano

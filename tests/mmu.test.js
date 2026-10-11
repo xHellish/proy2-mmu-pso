@@ -71,8 +71,8 @@ test("a new MMU starts with all metrics in zero", () => {
 });
 
 test("create_mmu rejects a missing algorithm", () => {
-  assert.throws(() => create_mmu(null), /requires an algorithm object/);
-  assert.throws(() => create_mmu(undefined), /requires an algorithm object/);
+  assert.throws(() => create_mmu(null), /requiere un objeto de algoritmo/);
+  assert.throws(() => create_mmu(undefined), /requiere un objeto de algoritmo/);
 });
 
 test("create_mmu rejects an algorithm without the full interface", () => {
@@ -82,7 +82,7 @@ test("create_mmu rejects an algorithm without the full interface", () => {
     on_unload: () => {},
   };
 
-  assert.throws(() => create_mmu(incomplete_algorithm), /missing the choose_victim function/);
+  assert.throws(() => create_mmu(incomplete_algorithm), /falta la función choose_victim/);
 });
 
 // =============================================
@@ -213,8 +213,8 @@ test("new of more than 100 pages evicts its own pages", () => {
 test("new rejects an invalid size", () => {
   const mmu = create_mmu(create_fifo_algorithm());
 
-  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 0)), /Invalid size for new/);
-  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 2.5)), /Invalid size for new/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 0)), /Tamaño inválido para new/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 2.5)), /Tamaño inválido para new/);
 });
 
 test("new rejects an operation whose ptr does not match the assigned one", () => {
@@ -222,14 +222,14 @@ test("new rejects an operation whose ptr does not match the assigned one", () =>
 
   assert.throws(
     () => mmu.execute(create_operation("new", 1, 7, 10)),
-    /expects ptr 7 but the next ptr to assign is 1/,
+    /espera el ptr 7 pero el siguiente ptr a asignar es 1/,
   );
 });
 
 test("execute rejects an unknown operation type", () => {
   const mmu = create_mmu(create_fifo_algorithm());
 
-  assert.throws(() => mmu.execute({ type: "free", pid: 1, ptr: 1, size: null }), /Unknown operation type: free/);
+  assert.throws(() => mmu.execute({ type: "free", pid: 1, ptr: 1, size: null }), /Tipo de operación desconocido: free/);
 });
 
 // =============================================
@@ -297,8 +297,8 @@ test("use rejects a ptr that the process does not own", () => {
   const mmu = create_mmu(create_fifo_algorithm());
   mmu.execute(create_operation("new", 1, 1, 10));
 
-  assert.throws(() => mmu.execute(create_operation("use", 2, 1, null)), /Process 2 does not own ptr 1/);
-  assert.throws(() => mmu.execute(create_operation("use", 1, 9, null)), /Process 1 does not own ptr 9/);
+  assert.throws(() => mmu.execute(create_operation("use", 2, 1, null)), /El proceso 2 no es dueño del ptr 1/);
+  assert.throws(() => mmu.execute(create_operation("use", 1, 9, null)), /El proceso 1 no es dueño del ptr 9/);
 });
 
 // =============================================
@@ -350,8 +350,8 @@ test("a deleted ptr cannot be used or deleted again", () => {
   mmu.execute(create_operation("new", 1, 1, 10));
   mmu.execute(create_operation("delete", 1, 1, null));
 
-  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /Process 1 does not own ptr 1/);
-  assert.throws(() => mmu.execute(create_operation("delete", 1, 1, null)), /Process 1 does not own ptr 1/);
+  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /El proceso 1 no es dueño del ptr 1/);
+  assert.throws(() => mmu.execute(create_operation("delete", 1, 1, null)), /El proceso 1 no es dueño del ptr 1/);
 });
 
 test("ptr values are never reused after a delete", () => {
@@ -360,7 +360,7 @@ test("ptr values are never reused after a delete", () => {
   mmu.execute(create_operation("delete", 1, 1, null));
 
   assert.equal(mmu.execute(create_operation("new", 1, 2, 10)), 2);
-  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 10)), /next ptr to assign is 3/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 10)), /el siguiente ptr a asignar es 3/);
 });
 
 test("a new rejected for its ptr does not change the MMU state", () => {
@@ -368,7 +368,7 @@ test("a new rejected for its ptr does not change the MMU state", () => {
   mmu.execute(create_operation("new", 1, 1, 10));
   const metrics_before = mmu.get_metrics();
 
-  assert.throws(() => mmu.execute(create_operation("new", 1, 9, 10)), /next ptr to assign/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 9, 10)), /el siguiente ptr a asignar/);
 
   assert.deepEqual(mmu.get_metrics(), metrics_before);
   assert.equal(mmu.get_pages().length, 1);
@@ -408,8 +408,8 @@ test("a killed process cannot be killed again or request memory", () => {
   mmu.execute(create_operation("new", 1, 1, 10));
   mmu.execute(create_operation("kill", 1, null, null));
 
-  assert.throws(() => mmu.execute(create_operation("kill", 1, null, null)), /Process 1 was already killed/);
-  assert.throws(() => mmu.execute(create_operation("new", 1, 2, 10)), /was already killed, it cannot request memory/);
+  assert.throws(() => mmu.execute(create_operation("kill", 1, null, null)), /El proceso 1 ya terminó con kill/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 2, 10)), /ya terminó con kill, no puede pedir memoria/);
 });
 
 test("the ptr of a killed process cannot be used", () => {
@@ -417,5 +417,5 @@ test("the ptr of a killed process cannot be used", () => {
   mmu.execute(create_operation("new", 1, 1, 10));
   mmu.execute(create_operation("kill", 1, null, null));
 
-  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /Process 1 does not own ptr 1/);
+  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /El proceso 1 no es dueño del ptr 1/);
 });

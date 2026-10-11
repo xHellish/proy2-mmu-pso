@@ -162,18 +162,18 @@ test("most blocks are small but some span several pages", () => {
 // ---------------------------------------------
 
 test("generate_operations rejects a non integer seed", () => {
-  assert.throws(() => generate_operations("abc", 10, 500), /Seed must be an integer/);
-  assert.throws(() => generate_operations(1.5, 10, 500), /Seed must be an integer/);
+  assert.throws(() => generate_operations("abc", 10, 500), /La semilla debe ser un entero/);
+  assert.throws(() => generate_operations(1.5, 10, 500), /La semilla debe ser un entero/);
 });
 
 test("generate_operations rejects an invalid process or operation count", () => {
-  assert.throws(() => generate_operations(1, 0, 500), /Process count must be a positive integer/);
-  assert.throws(() => generate_operations(1, 10, -5), /Operation count must be a positive integer/);
-  assert.throws(() => generate_operations(1, 10, 2.5), /Operation count must be a positive integer/);
+  assert.throws(() => generate_operations(1, 0, 500), /La cantidad de procesos debe ser un entero positivo/);
+  assert.throws(() => generate_operations(1, 10, -5), /La cantidad de operaciones debe ser un entero positivo/);
+  assert.throws(() => generate_operations(1, 10, 2.5), /La cantidad de operaciones debe ser un entero positivo/);
 });
 
 test("generate_operations rejects an N too small for P processes", () => {
-  assert.throws(() => generate_operations(1, 10, 19), /too small for 10 processes/);
+  assert.throws(() => generate_operations(1, 10, 19), /muy pocas para 10 procesos/);
   assert.doesNotThrow(() => generate_operations(1, 10, 20));
 });
 

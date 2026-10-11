@@ -26,11 +26,11 @@ const PAGE_SIZE_KB = PAGE_SIZE_BYTES / 1024;
 export function create_mmu(algorithm) {
   // Paso 1: validar que el algoritmo cumpla la interfaz
   if (algorithm === null || typeof algorithm !== "object") {
-    throw new Error("MMU requires an algorithm object");
+    throw new Error("La MMU requiere un objeto de algoritmo");
   }
   for (const hook_name of REQUIRED_ALGORITHM_HOOKS) {
     if (typeof algorithm[hook_name] !== "function") {
-      throw new Error(`Algorithm is missing the ${hook_name} function`);
+      throw new Error(`Al algoritmo le falta la función ${hook_name}`);
     }
   }
 
@@ -129,7 +129,7 @@ export function create_mmu(algorithm) {
       const candidates = get_ram_pages();
       const victim = algorithm.choose_victim(candidates, context);
       if (!candidates.includes(victim)) {
-        throw new Error("Algorithm chose a victim page that is not in RAM");
+        throw new Error("El algoritmo eligió una página víctima que no está en RAM");
       }
       frame_index = victim.frame;
       evict_page(victim);
@@ -154,10 +154,10 @@ export function create_mmu(algorithm) {
   function new_operation(pid, size, context) {
     // Paso 1: validar el proceso y el tamano
     if (killed_pids.has(pid)) {
-      throw new Error(`Process ${pid} was already killed, it cannot request memory`);
+      throw new Error(`El proceso ${pid} ya terminó con kill, no puede pedir memoria`);
     }
     if (!Number.isInteger(size) || size < 1) {
-      throw new Error(`Invalid size for new: ${size}`);
+      throw new Error(`Tamaño inválido para new: ${size}`);
     }
 
     // Paso 2: registrar al proceso y asignar el siguiente ptr, que nunca se reutiliza
@@ -196,7 +196,7 @@ export function create_mmu(algorithm) {
   function assert_owns_ptr(pid, ptr) {
     const owned_ptrs = symbol_table.get(pid);
     if (owned_ptrs === undefined || !owned_ptrs.has(ptr)) {
-      throw new Error(`Process ${pid} does not own ptr ${ptr}`);
+      throw new Error(`El proceso ${pid} no es dueño del ptr ${ptr}`);
     }
   }
 
@@ -249,7 +249,7 @@ export function create_mmu(algorithm) {
   function kill_operation(pid) {
     // Paso 1: un proceso solo se puede matar una vez
     if (killed_pids.has(pid)) {
-      throw new Error(`Process ${pid} was already killed`);
+      throw new Error(`El proceso ${pid} ya terminó con kill`);
     }
 
     // Paso 2: copiar los ptr del proceso para poder borrarlos sin modificar el conjunto en el ciclo
@@ -345,7 +345,7 @@ export function create_mmu(algorithm) {
     if (operation.type === "new") {
       // El ptr se valida antes de tocar el estado, para no dejar paginas a medias
       if (operation.ptr !== next_ptr) {
-        throw new Error(`Operation expects ptr ${operation.ptr} but the next ptr to assign is ${next_ptr}`);
+        throw new Error(`La operación espera el ptr ${operation.ptr} pero el siguiente ptr a asignar es ${next_ptr}`);
       }
       result = new_operation(operation.pid, operation.size, context);
     } else if (operation.type === "use") {
@@ -355,7 +355,7 @@ export function create_mmu(algorithm) {
     } else if (operation.type === "kill") {
       kill_operation(operation.pid);
     } else {
-      throw new Error(`Unknown operation type: ${operation.type}`);
+      throw new Error(`Tipo de operación desconocido: ${operation.type}`);
     }
 
     // Paso 3: contar la operacion ejecutada

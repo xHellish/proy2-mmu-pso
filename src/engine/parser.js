@@ -25,7 +25,7 @@ function parse_integer(raw_value, description, operation_number) {
   // Paso 2: aceptar solo digitos
   if (!INTEGER_REGEX.test(trimmed)) {
     throw new Error(
-      `Operation ${operation_number}: ${description} must be a non-negative integer, received "${trimmed}"`,
+      `Operación ${operation_number}: ${description} debe ser un entero no negativo, se recibió "${trimmed}"`,
     );
   }
 
@@ -35,7 +35,7 @@ function parse_integer(raw_value, description, operation_number) {
 // Verifica que un valor sea un entero positivo o lanza un error con el contexto
 function assert_positive_integer(value, description, label) {
   if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`${label}: ${description} must be a positive integer, received ${value}`);
+    throw new Error(`${label}: ${description} debe ser un entero positivo, se recibió ${value}`);
   }
 }
 
@@ -47,14 +47,14 @@ function assert_positive_integer(value, description, label) {
 export function parse_operations(text) {
   // Paso 1: validar la entrada y limpiar BOM y comentarios //
   if (typeof text !== "string") {
-    throw new Error("Operations text must be a string");
+    throw new Error("El texto de operaciones debe ser una cadena");
   }
   const cleaned = text.replace(/^﻿/, "").replace(COMMENT_REGEX, "");
 
   // Paso 2: rechazar cualquier texto que no sea una operacion, coma o espacio
   const leftover = cleaned.replace(OPERATION_REGEX, "").replace(SEPARATOR_REGEX, "");
   if (leftover.length > 0) {
-    throw new Error(`Unexpected text in operations file: "${leftover.slice(0, 30)}"`);
+    throw new Error(`Texto inesperado en el archivo de operaciones: "${leftover.slice(0, 30)}"`);
   }
 
   // Paso 3: recorrer las operaciones en orden de aparicion
@@ -71,11 +71,11 @@ export function parse_operations(text) {
     if (type === "new") {
       if (args.length !== 2) {
         throw new Error(
-          `Operation ${operation_number}: new expects 2 arguments (pid, size), received ${args.length}`,
+          `Operación ${operation_number}: new espera 2 argumentos (pid, size), recibió ${args.length}`,
         );
       }
-      const pid = parse_integer(args[0], "pid", operation_number);
-      const size = parse_integer(args[1], "size", operation_number);
+      const pid = parse_integer(args[0], "el pid", operation_number);
+      const size = parse_integer(args[1], "el tamaño", operation_number);
       operations.push(create_operation("new", pid, next_ptr, size));
       owner_by_ptr.set(next_ptr, pid);
       next_ptr++;
@@ -85,18 +85,18 @@ export function parse_operations(text) {
     // Paso 3.2: use(ptr), delete(ptr) y kill(pid) reciben un solo argumento
     if (args.length !== 1) {
       throw new Error(
-        `Operation ${operation_number}: ${type} expects 1 argument, received ${args.length}`,
+        `Operación ${operation_number}: ${type} espera 1 argumento, recibió ${args.length}`,
       );
     }
 
     if (type === "kill") {
-      const pid = parse_integer(args[0], "pid", operation_number);
+      const pid = parse_integer(args[0], "el pid", operation_number);
       operations.push(create_operation("kill", pid, null, null));
       continue;
     }
 
     // Paso 3.3: use/delete toman el pid dueno desde el ptr (null si el ptr no existe)
-    const ptr = parse_integer(args[0], "ptr", operation_number);
+    const ptr = parse_integer(args[0], "el ptr", operation_number);
     let owner_pid = owner_by_ptr.get(ptr);
     if (owner_pid === undefined) {
       owner_pid = null;
@@ -106,7 +106,7 @@ export function parse_operations(text) {
 
   // Paso 4: un archivo sin operaciones no es valido
   if (operations.length === 0) {
-    throw new Error("Operations file has no operations");
+    throw new Error("El archivo de operaciones no tiene operaciones");
   }
 
   // Paso 5: validar las reglas del enunciado antes de devolver
@@ -122,7 +122,7 @@ export function parse_operations(text) {
 export function validate_operations(operations) {
   // Paso 1: la lista debe tener al menos una operacion
   if (!Array.isArray(operations) || operations.length === 0) {
-    throw new Error("Operations list must contain at least one operation");
+    throw new Error("La lista de operaciones debe tener al menos una operación");
   }
 
   const owner_by_ptr = new Map();
@@ -132,17 +132,17 @@ export function validate_operations(operations) {
 
   // Paso 2: revisar cada operacion contra el estado acumulado
   for (const [index, operation] of operations.entries()) {
-    const label = `Operation ${index + 1} (${serialize_operation(operation)})`;
+    const label = `Operación ${index + 1} (${serialize_operation(operation)})`;
 
     // Paso 2.1: new debe ser de un proceso vivo y traer el ptr secuencial
     if (operation.type === "new") {
-      assert_positive_integer(operation.pid, "pid", label);
-      assert_positive_integer(operation.size, "size", label);
+      assert_positive_integer(operation.pid, "el pid", label);
+      assert_positive_integer(operation.size, "el tamaño", label);
       if (killed_pids.has(operation.pid)) {
-        throw new Error(`${label}: process ${operation.pid} was already killed`);
+        throw new Error(`${label}: el proceso ${operation.pid} ya terminó con kill`);
       }
       if (operation.ptr !== expected_ptr) {
-        throw new Error(`${label}: expected ptr ${expected_ptr}, received ${operation.ptr}`);
+        throw new Error(`${label}: se esperaba el ptr ${expected_ptr}, se recibió ${operation.ptr}`);
       }
       owner_by_ptr.set(operation.ptr, operation.pid);
       expected_ptr++;
@@ -151,9 +151,9 @@ export function validate_operations(operations) {
 
     // Paso 2.2: kill solo se puede usar una vez por proceso
     if (operation.type === "kill") {
-      assert_positive_integer(operation.pid, "pid", label);
+      assert_positive_integer(operation.pid, "el pid", label);
       if (killed_pids.has(operation.pid)) {
-        throw new Error(`${label}: process ${operation.pid} was already killed`);
+        throw new Error(`${label}: el proceso ${operation.pid} ya terminó con kill`);
       }
       killed_pids.add(operation.pid);
       continue;
@@ -161,20 +161,20 @@ export function validate_operations(operations) {
 
     // Paso 2.3: use y delete solo aplican a un ptr existente y vivo
     if (!owner_by_ptr.has(operation.ptr)) {
-      throw new Error(`${label}: ptr ${operation.ptr} was never created`);
+      throw new Error(`${label}: el ptr ${operation.ptr} nunca fue creado`);
     }
     const owner_pid = owner_by_ptr.get(operation.ptr);
     if (killed_pids.has(owner_pid)) {
       throw new Error(
-        `${label}: ptr ${operation.ptr} belongs to process ${owner_pid}, which was already killed`,
+        `${label}: el ptr ${operation.ptr} pertenece al proceso ${owner_pid}, que ya terminó con kill`,
       );
     }
     if (deleted_ptrs.has(operation.ptr)) {
-      throw new Error(`${label}: ptr ${operation.ptr} was already deleted`);
+      throw new Error(`${label}: el ptr ${operation.ptr} ya fue borrado`);
     }
     if (operation.pid !== owner_pid) {
       throw new Error(
-        `${label}: ptr ${operation.ptr} belongs to process ${owner_pid}, not ${operation.pid}`,
+        `${label}: el ptr ${operation.ptr} pertenece al proceso ${owner_pid}, no al ${operation.pid}`,
       );
     }
     if (operation.type === "delete") {
@@ -191,7 +191,7 @@ export function validate_operations(operations) {
 export function serialize_operation(operation) {
   // Paso 1: validar el tipo
   if (!OPERATION_TYPES.includes(operation.type)) {
-    throw new Error(`Invalid operation type: ${operation.type}`);
+    throw new Error(`Tipo de operación inválido: ${operation.type}`);
   }
 
   // Paso 2: armar el texto segun el tipo

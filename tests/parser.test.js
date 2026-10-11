@@ -87,29 +87,29 @@ test("ignores a leading BOM", () => {
 // ---------------------------------------------
 
 test("rejects text that is not an operation", () => {
-  assert.throws(() => parse_operations("new(1,10)\nhello\nkill(1)"), /Unexpected text/);
+  assert.throws(() => parse_operations("new(1,10)\nhello\nkill(1)"), /Texto inesperado/);
 });
 
 test("rejects an empty file", () => {
-  assert.throws(() => parse_operations("  \n\n"), /no operations/);
+  assert.throws(() => parse_operations("  \n\n"), /no tiene operaciones/);
 });
 
 test("rejects a new with the wrong number of arguments", () => {
-  assert.throws(() => parse_operations("new(1)"), /new expects 2 arguments/);
+  assert.throws(() => parse_operations("new(1)"), /new espera 2 argumentos/);
 });
 
 test("rejects a use with the wrong number of arguments", () => {
-  assert.throws(() => parse_operations("new(1,10)\nuse(1,2)"), /use expects 1 argument/);
+  assert.throws(() => parse_operations("new(1,10)\nuse(1,2)"), /use espera 1 argumento/);
 });
 
 test("rejects non integer arguments", () => {
-  assert.throws(() => parse_operations("new(1,abc)"), /size must be a non-negative integer/);
-  assert.throws(() => parse_operations("new(1,-5)"), /size must be a non-negative integer/);
-  assert.throws(() => parse_operations("new(1,2.5)"), /size must be a non-negative integer/);
+  assert.throws(() => parse_operations("new(1,abc)"), /el tamaño debe ser un entero no negativo/);
+  assert.throws(() => parse_operations("new(1,-5)"), /el tamaño debe ser un entero no negativo/);
+  assert.throws(() => parse_operations("new(1,2.5)"), /el tamaño debe ser un entero no negativo/);
 });
 
 test("rejects a non string input", () => {
-  assert.throws(() => parse_operations(null), /must be a string/);
+  assert.throws(() => parse_operations(null), /debe ser una cadena/);
 });
 
 // =============================================
@@ -117,42 +117,42 @@ test("rejects a non string input", () => {
 // ---------------------------------------------
 
 test("rejects use of a ptr that was never created", () => {
-  assert.throws(() => parse_operations("new(1,10)\nuse(2)"), /ptr 2 was never created/);
+  assert.throws(() => parse_operations("new(1,10)\nuse(2)"), /el ptr 2 nunca fue creado/);
 });
 
 test("rejects use of a deleted ptr", () => {
   const text = "new(1,10)\ndelete(1)\nuse(1)";
 
-  assert.throws(() => parse_operations(text), /ptr 1 was already deleted/);
+  assert.throws(() => parse_operations(text), /el ptr 1 ya fue borrado/);
 });
 
 test("rejects delete of a deleted ptr", () => {
   const text = "new(1,10)\ndelete(1)\ndelete(1)";
 
-  assert.throws(() => parse_operations(text), /ptr 1 was already deleted/);
+  assert.throws(() => parse_operations(text), /el ptr 1 ya fue borrado/);
 });
 
 test("rejects use of a ptr whose process was killed", () => {
   const text = "new(1,10)\nkill(1)\nuse(1)";
 
-  assert.throws(() => parse_operations(text), /which was already killed/);
+  assert.throws(() => parse_operations(text), /que ya terminó con kill/);
 });
 
 test("rejects new after the kill of the same process", () => {
   const text = "new(1,10)\nkill(1)\nnew(1,10)";
 
-  assert.throws(() => parse_operations(text), /process 1 was already killed/);
+  assert.throws(() => parse_operations(text), /el proceso 1 ya terminó con kill/);
 });
 
 test("rejects a second kill of the same process", () => {
   const text = "new(1,10)\nkill(1)\nkill(1)";
 
-  assert.throws(() => parse_operations(text), /process 1 was already killed/);
+  assert.throws(() => parse_operations(text), /el proceso 1 ya terminó con kill/);
 });
 
 test("rejects zero as pid or size", () => {
-  assert.throws(() => parse_operations("new(0,10)"), /pid must be a positive integer/);
-  assert.throws(() => parse_operations("new(1,0)"), /size must be a positive integer/);
+  assert.throws(() => parse_operations("new(0,10)"), /el pid debe ser un entero positivo/);
+  assert.throws(() => parse_operations("new(1,0)"), /el tamaño debe ser un entero positivo/);
 });
 
 test("validate rejects a use with the wrong owner pid", () => {
@@ -161,17 +161,17 @@ test("validate rejects a use with the wrong owner pid", () => {
     create_operation("use", 2, 1, null),
   ];
 
-  assert.throws(() => validate_operations(operations), /belongs to process 1, not 2/);
+  assert.throws(() => validate_operations(operations), /pertenece al proceso 1, no al 2/);
 });
 
 test("validate rejects a new with a non sequential ptr", () => {
   const operations = [create_operation("new", 1, 5, 10)];
 
-  assert.throws(() => validate_operations(operations), /expected ptr 1, received 5/);
+  assert.throws(() => validate_operations(operations), /se esperaba el ptr 1, se recibió 5/);
 });
 
 test("validate rejects an empty list", () => {
-  assert.throws(() => validate_operations([]), /at least one operation/);
+  assert.throws(() => validate_operations([]), /al menos una operación/);
 });
 
 test("validate accepts processes interleaved freely", () => {
@@ -200,5 +200,5 @@ test("parse of a serialized list returns the same operations", () => {
 test("serialize rejects an invalid operation type", () => {
   const operations = [{ type: "free", pid: 1, ptr: null, size: null }];
 
-  assert.throws(() => serialize_operations(operations), /Invalid operation type/);
+  assert.throws(() => serialize_operations(operations), /Tipo de operación inválido/);
 });

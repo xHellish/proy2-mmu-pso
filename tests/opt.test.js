@@ -90,11 +90,11 @@ test("OPT breaks a tie between pages of the same ptr with FIFO", () => {
 });
 
 test("OPT rejects a missing operation list, an empty candidate list and a missing context", () => {
-  assert.throws(() => create_opt_algorithm(null), /requires the full list of operations/);
+  assert.throws(() => create_opt_algorithm(null), /requiere la lista completa de operaciones/);
 
   const opt = create_opt_algorithm([filler()]);
-  assert.throws(() => opt.choose_victim([], { operation_index: 0 }), /no candidates to evict/);
-  assert.throws(() => opt.choose_victim([create_ram_page(1, 1, 5)], {}), /needs the current operation_index/);
+  assert.throws(() => opt.choose_victim([], { operation_index: 0 }), /no tiene candidatos para desalojar/);
+  assert.throws(() => opt.choose_victim([create_ram_page(1, 1, 5)], {}), /necesita el operation_index actual/);
 });
 
 // =============================================

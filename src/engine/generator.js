@@ -30,7 +30,7 @@ const LARGE_MAX_PAGES = 50;
 // Verifica que un parametro sea un entero positivo o lanza un error
 function assert_positive_integer(value, description) {
   if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`${description} must be a positive integer, received ${value}`);
+    throw new Error(`${description} debe ser un entero positivo, se recibió ${value}`);
   }
 }
 
@@ -94,13 +94,13 @@ function split_quotas(next_random, process_count, work_budget) {
 export function generate_operations(seed, process_count, operation_count) {
   // Paso 1: validar parametros; cada proceso necesita al menos una operacion y su kill
   if (!Number.isInteger(seed)) {
-    throw new Error(`Seed must be an integer, received: ${seed}`);
+    throw new Error(`La semilla debe ser un entero, se recibió: ${seed}`);
   }
-  assert_positive_integer(process_count, "Process count");
-  assert_positive_integer(operation_count, "Operation count");
+  assert_positive_integer(process_count, "La cantidad de procesos");
+  assert_positive_integer(operation_count, "La cantidad de operaciones");
   if (operation_count < 2 * process_count) {
     throw new Error(
-      `Operation count ${operation_count} is too small for ${process_count} processes: at least ${2 * process_count} are needed`,
+      `${operation_count} operaciones son muy pocas para ${process_count} procesos: se necesitan al menos ${2 * process_count}`,
     );
   }
 
@@ -150,7 +150,7 @@ export function generate_operations(seed, process_count, operation_count) {
   // Paso 5: comprobar que la lista cumple las reglas y tiene exactamente N operaciones
   if (operations.length !== operation_count) {
     throw new Error(
-      `Generator produced ${operations.length} operations instead of ${operation_count}`,
+      `El generador produjo ${operations.length} operaciones en lugar de ${operation_count}`,
     );
   }
   validate_operations(operations);

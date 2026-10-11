@@ -86,7 +86,7 @@ test("LFU resets the frequency to 0 when a page goes to disk", () => {
 test("LFU rejects an empty candidate list", () => {
   const lfu = create_lfu_algorithm();
 
-  assert.throws(() => lfu.choose_victim([], {}), /no candidates to evict/);
+  assert.throws(() => lfu.choose_victim([], {}), /no tiene candidatos para desalojar/);
 });
 
 // =============================================
