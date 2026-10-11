@@ -229,5 +229,74 @@ test("new rejects an operation whose ptr does not match the assigned one", () =>
 test("execute rejects operations that are not implemented yet", () => {
   const mmu = create_mmu(create_fifo_algorithm());
 
-  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /not implemented yet/);
+  assert.throws(() => mmu.execute(create_operation("delete", 1, 1, null)), /not implemented yet/);
+});
+
+// =============================================
+// Operacion use
+// ---------------------------------------------
+
+test("use of a page in RAM is a hit and charges 1 second", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 500));
+
+  mmu.execute(create_operation("use", 1, 1, null));
+  const metrics = mmu.get_metrics();
+
+  assert.equal(metrics.clock_seconds, 6);
+  assert.equal(metrics.page_hits, 1);
+  assert.equal(metrics.page_faults, 1);
+  assert.equal(metrics.thrashing_seconds, 5);
+});
+
+test("use of a ptr with several pages charges 1 second per page", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 3 * PAGE_SIZE_BYTES));
+
+  mmu.execute(create_operation("use", 1, 1, null));
+  const metrics = mmu.get_metrics();
+
+  assert.equal(metrics.clock_seconds, 15 + 3);
+  assert.equal(metrics.page_hits, 3);
+});
+
+test("use of a page on disk is a fault, loads it and evicts the oldest page", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, PAGE_SIZE_BYTES));
+  mmu.execute(create_operation("new", 2, 2, RAM_PAGES * PAGE_SIZE_BYTES));
+  const before = mmu.get_pages();
+  assert.equal(before[0].in_ram, false);
+
+  mmu.execute(create_operation("use", 1, 1, null));
+  const after = mmu.get_pages();
+  const metrics = mmu.get_metrics();
+
+  assert.equal(after[0].in_ram, true);
+  assert.equal(after[0].disk_addr, null);
+  assert.equal(after[1].in_ram, false);
+  assert.equal(metrics.clock_seconds, 5 + 500 + 5);
+  assert.equal(metrics.thrashing_seconds, 510);
+  assert.equal(metrics.page_hits, 0);
+  assert.equal(metrics.loaded_pages, 100);
+  assert.equal(metrics.unloaded_pages, 1);
+});
+
+test("use of a ptr larger than the RAM faults on every page with FIFO", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 410000));
+
+  mmu.execute(create_operation("use", 1, 1, null));
+  const metrics = mmu.get_metrics();
+
+  assert.equal(metrics.page_faults, 101 + 101);
+  assert.equal(metrics.page_hits, 0);
+  assert.equal(metrics.clock_seconds, 505 + 505);
+});
+
+test("use rejects a ptr that the process does not own", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 10));
+
+  assert.throws(() => mmu.execute(create_operation("use", 2, 1, null)), /Process 2 does not own ptr 1/);
+  assert.throws(() => mmu.execute(create_operation("use", 1, 9, null)), /Process 1 does not own ptr 9/);
 });

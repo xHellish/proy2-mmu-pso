@@ -192,6 +192,31 @@ export function create_mmu(algorithm) {
     return ptr;
   }
 
+  // Verifica que el proceso tenga el ptr en su tabla de simbolos o lanza un error
+  function assert_owns_ptr(pid, ptr) {
+    const owned_ptrs = symbol_table.get(pid);
+    if (owned_ptrs === undefined || !owned_ptrs.has(ptr)) {
+      throw new Error(`Process ${pid} does not own ptr ${ptr}`);
+    }
+  }
+
+  // use: garantiza que todas las paginas del ptr esten en RAM, una por una
+  function use_operation(pid, ptr, context) {
+    // Paso 1: el ptr debe estar en la tabla de simbolos del proceso
+    assert_owns_ptr(pid, ptr);
+
+    // Paso 2: cada pagina es un hit (1s) si esta en RAM o un fallo (5s) si esta en disco
+    for (const page of memory_map.get(ptr)) {
+      if (page.in_ram) {
+        charge_hit();
+        algorithm.on_access(page, context);
+      } else {
+        charge_fault();
+        load_page(page, context);
+      }
+    }
+  }
+
   // =============================================
   // Consultas del estado
   // ---------------------------------------------
@@ -269,6 +294,8 @@ export function create_mmu(algorithm) {
       if (result !== operation.ptr) {
         throw new Error(`MMU assigned ptr ${result} but the operation expects ptr ${operation.ptr}`);
       }
+    } else if (operation.type === "use") {
+      use_operation(operation.pid, operation.ptr, context);
     } else {
       throw new Error(`Operation ${operation.type} is not implemented yet`);
     }
