@@ -2,7 +2,13 @@
 // Imports
 // ---------------------------------------------
 
-import { PAGE_SIZE_BYTES, RAM_PAGES } from "./types.js";
+import {
+  PAGE_SIZE_BYTES,
+  RAM_PAGES,
+  HIT_COST_SECONDS,
+  FAULT_COST_SECONDS,
+  create_page,
+} from "./types.js";
 
 // =============================================
 // Constantes
@@ -55,6 +61,136 @@ export function create_mmu(algorithm) {
   let next_page_id = 1;
   let next_disk_addr = 1;
   let operations_executed = 0;
+
+  // =============================================
+  // Reloj
+  // ---------------------------------------------
+
+  // Suma al reloj un hit: la pagina ya estaba en RAM
+  function charge_hit() {
+    stats.clock_seconds += HIT_COST_SECONDS;
+    stats.page_hits++;
+  }
+
+  // Suma al reloj un fallo de pagina, que tambien cuenta como thrashing
+  function charge_fault() {
+    stats.clock_seconds += FAULT_COST_SECONDS;
+    stats.thrashing_seconds += FAULT_COST_SECONDS;
+    stats.page_faults++;
+  }
+
+  // =============================================
+  // Manejo de la RAM
+  // ---------------------------------------------
+
+  // Busca el primer marco libre; devuelve null si la RAM esta llena
+  function find_free_frame() {
+    for (let frame_index = 0; frame_index < frames.length; frame_index++) {
+      if (frames[frame_index] === null) {
+        return frame_index;
+      }
+    }
+    return null;
+  }
+
+  // Lista las paginas que estan en RAM en este momento
+  function get_ram_pages() {
+    const ram_pages = [];
+    for (const page of frames) {
+      if (page !== null) {
+        ram_pages.push(page);
+      }
+    }
+    return ram_pages;
+  }
+
+  // Manda una pagina de RAM a disco y le asigna una direccion de disco
+  function evict_page(page) {
+    // Paso 1: liberar el marco
+    frames[page.frame] = null;
+    page.in_ram = false;
+    page.frame = null;
+
+    // Paso 2: asignar direccion de disco
+    page.disk_addr = next_disk_addr;
+    next_disk_addr++;
+
+    // Paso 3: avisar al algoritmo
+    algorithm.on_unload(page);
+  }
+
+  // Trae una pagina a RAM; si no hay marco libre, desaloja la victima que elige el algoritmo
+  function load_page(page, context) {
+    // Paso 1: buscar un marco libre
+    let frame_index = find_free_frame();
+
+    // Paso 2: si la RAM esta llena, elegir una victima entre todas las paginas en RAM
+    if (frame_index === null) {
+      const candidates = get_ram_pages();
+      const victim = algorithm.choose_victim(candidates, context);
+      if (!candidates.includes(victim)) {
+        throw new Error("Algorithm chose a victim page that is not in RAM");
+      }
+      frame_index = victim.frame;
+      evict_page(victim);
+    }
+
+    // Paso 3: colocar la pagina en el marco
+    page.in_ram = true;
+    page.frame = frame_index;
+    page.disk_addr = null;
+    page.loaded_at = stats.clock_seconds;
+    frames[frame_index] = page;
+
+    // Paso 4: avisar al algoritmo
+    algorithm.on_load(page, context);
+  }
+
+  // =============================================
+  // Operaciones
+  // ---------------------------------------------
+
+  // new: crea las paginas del bloque en RAM y devuelve el ptr asignado
+  function new_operation(pid, size, context) {
+    // Paso 1: validar el proceso y el tamano
+    if (killed_pids.has(pid)) {
+      throw new Error(`Process ${pid} was already killed, it cannot request memory`);
+    }
+    if (!Number.isInteger(size) || size < 1) {
+      throw new Error(`Invalid size for new: ${size}`);
+    }
+
+    // Paso 2: registrar al proceso y asignar el siguiente ptr, que nunca se reutiliza
+    if (!symbol_table.has(pid)) {
+      symbol_table.set(pid, new Set());
+    }
+    active_pids.add(pid);
+    const ptr = next_ptr;
+    next_ptr++;
+
+    // Paso 3: calcular paginas y fragmentacion interna del bloque
+    const page_count = Math.ceil(size / PAGE_SIZE_BYTES);
+    const wasted_bytes = page_count * PAGE_SIZE_BYTES - size;
+    fragmentation_by_ptr.set(ptr, wasted_bytes);
+    stats.fragmentation_bytes += wasted_bytes;
+
+    // Paso 4: registrar el ptr en el mapa de memoria y en la tabla de simbolos
+    const ptr_pages = [];
+    memory_map.set(ptr, ptr_pages);
+    symbol_table.get(pid).add(ptr);
+
+    // Paso 5: crear cada pagina en RAM; una pagina nueva siempre cuenta como fallo
+    for (let page_index = 0; page_index < page_count; page_index++) {
+      const page = create_page(next_page_id, pid, ptr);
+      next_page_id++;
+      pages.set(page.id, page);
+      ptr_pages.push(page);
+      charge_fault();
+      load_page(page, context);
+    }
+
+    return ptr;
+  }
 
   // =============================================
   // Consultas del estado
@@ -123,7 +259,23 @@ export function create_mmu(algorithm) {
 
   // Ejecuta una operacion completa; new devuelve el ptr asignado y las demas null
   function execute(operation) {
-    throw new Error(`Operation ${operation.type} is not implemented yet`);
+    // Paso 1: el contexto le dice al algoritmo en que operacion estamos
+    const context = { operation_index: operations_executed };
+    let result = null;
+
+    // Paso 2: despachar segun el tipo de operacion
+    if (operation.type === "new") {
+      result = new_operation(operation.pid, operation.size, context);
+      if (result !== operation.ptr) {
+        throw new Error(`MMU assigned ptr ${result} but the operation expects ptr ${operation.ptr}`);
+      }
+    } else {
+      throw new Error(`Operation ${operation.type} is not implemented yet`);
+    }
+
+    // Paso 3: contar la operacion ejecutada
+    operations_executed++;
+    return result;
   }
 
   return { execute, get_metrics, get_pages, get_frames };
