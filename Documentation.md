@@ -50,6 +50,17 @@ src/ui/           Pantalla de preparación y de simulación
 | `delete` | Borra las páginas del `ptr` y resta su fragmentación | 0 |
 | `kill` | `delete` de todos los `ptr` del proceso y lo marca como terminado | 0 |
 
+### Generador
+
+`generate_operations(seed, P, N)` devuelve exactamente N operaciones válidas para P procesos, y la misma semilla produce siempre el mismo archivo. Pasos:
+
+1. Reserva P operaciones para los `kill` y reparte las `N - P` restantes entre los procesos. Cada proceso recibe al menos una.
+2. En cada paso elige un proceso vivo al azar y una operación válida para él: sin `ptr` vivos solo puede hacer `new`.
+3. Cuando un proceso agota su cuota, ejecuta su `kill` y sale del sorteo, así el `kill` es siempre su última operación.
+4. Al final valida la lista con `validate_operations`.
+
+Falla con error explícito si N es menor que `2 * P`, porque cada proceso necesita al menos una operación y su `kill`.
+
 ### Algoritmos de reemplazo
 
 | Algoritmo | Víctima | Datos que usa |
@@ -70,11 +81,22 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 
 ## Pendiente
 
-- Generador y botón de descarga en la UI.
+- Botón de descarga del archivo generado en la UI.
 - UI de preparación y de simulación.
 - Mostrar la columna MARK solo para SC en la UI (el motor ya mantiene `ref_bit`).
 
 ## Decision Log
+
+### 2026-10-11 - Parámetros del generador
+
+- El enunciado solo da reglas de validez; los tamaños y la frecuencia de cada operación son decisión propia.
+- Se genera exactamente N operaciones, contando los P `kill`. El enunciado dice que la suma "no supere N", pero así N=5000 siempre pide una simulación de 5000 operaciones.
+- Reparto de operaciones, cuando el proceso ya tiene `ptr` vivos: 15 % `new`, 70 % `use` y 15 % `delete`. Sin `ptr` vivos solo hace `new`.
+- Tamaños: 80 % de hasta 1 página, 15 % de 2 a 10 páginas y 5 % de 11 a 50 páginas. Nunca se acerca a las 100 páginas, así el autodesalojo solo aparece con archivos externos.
+- Los bloques de varias páginas son los que llenan la RAM y fuerzan reemplazos. Con solo bloques pequeños apenas hay desalojos.
+- Se probaron tres repartos con las nueve combinaciones de P y N. Con 30 % `new` y 10 % `delete` la V-RAM llegó a miles de por ciento y el thrashing a 76 %-99 % en todos los algoritmos. Con 15/70/15 los algoritmos se distinguen (P=10, N=500: OPT 63 % contra FIFO 79 %).
+- Consecuencia inherente al enunciado: toda página nueva cuenta como fallo de 5 s, por eso el thrashing nunca baja de 60 % con P=50 o 100. Cada proceso necesita al menos un `new`, y con N=500 y P=100 solo hay 5 operaciones por proceso.
+- Una descripción de estos valores va en el informe, junto con el desempate de LFU.
 
 ### 2026-10-10 - Reglas de SC, LRU y OPT
 
