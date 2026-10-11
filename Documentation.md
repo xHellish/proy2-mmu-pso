@@ -50,6 +50,16 @@ src/ui/           Pantalla de preparación y de simulación
 | `delete` | Borra las páginas del `ptr` y resta su fragmentación | 0 |
 | `kill` | `delete` de todos los `ptr` del proceso y lo marca como terminado | 0 |
 
+### Algoritmos de reemplazo
+
+| Algoritmo | Víctima | Datos que usa |
+|---|---|---|
+| FIFO | Menor `loaded_at` | `loaded_at` (lo asigna la MMU) |
+| SC | Cola FIFO; con `ref_bit` 1 lo pone en 0 y manda la página al final | `ref_bit` (columna MARK) y una cola propia |
+| LRU | Menor `last_use` | Contador de accesos propio, no el reloj |
+| LFU | Menor `freq`; empate: menor `loaded_at` y luego menor id | `freq` |
+| OPT | `ptr` con el siguiente `use` más lejano; sin usos futuros cuenta como infinito; empate: menor `loaded_at` y luego menor id | Lista de operaciones completa, `operation_index` del contexto |
+
 ### Interfaz de algoritmo
 
 Todo algoritmo expone `on_load(page, context)`, `on_access(page, context)`, `on_unload(page)` y `choose_victim(candidates, context)`. El `context` trae `operation_index`, el índice de la operación en curso (lo necesita OPT). La MMU asigna `loaded_at`, el marco y la dirección de disco; el algoritmo solo mantiene sus propios datos.
@@ -61,11 +71,22 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 ## Pendiente
 
 - Generador y botón de descarga en la UI.
-- Algoritmos SC, LRU, LFU y OPT (FIFO ya está).
 - UI de preparación y de simulación.
-- Aplicar en LFU y SC las reglas ya decididas (ver Decision Log): desempate y reinicio de `freq`, y columna MARK solo para SC.
+- Mostrar la columna MARK solo para SC en la UI (el motor ya mantiene `ref_bit`).
 
 ## Decision Log
+
+### 2026-10-10 - Reglas de SC, LRU y OPT
+
+- SC: una página entra a RAM con `ref_bit` en 1, porque cargar cuenta como un acceso (igual que `freq` en 1 en LFU). Todo acceso lo pone en 1.
+- SC lleva una cola propia y no modifica `loaded_at`, para que LOADED-T siga mostrando el instante real de carga. Al salir de RAM la página deja la cola y su bit vuelve a 0.
+- SC lanza un error explícito si su cola no coincide con las páginas en RAM, en vez de decidir con datos inconsistentes.
+- Consecuencia: con todas las páginas recién cargadas (bit 1), el primer desalojo de SC se comporta como FIFO. Se diferencia cuando hay accesos entre desalojos.
+- LRU usa un contador de accesos propio y no el reloj, porque un `new` de varias páginas avanza el reloj de a 5 s pero un contador nunca empata.
+- OPT mira la distancia por `ptr`, no por página. Las páginas de un mismo `ptr` empatan y se desempata como FIFO. Esa regla se usa para cualquier empate, no solo dentro del mismo `ptr`.
+- OPT necesita que la MMU ejecute las operaciones en orden desde el índice 0, porque compara `operation_index` con las posiciones de la lista que recibió al crearse.
+- Un `ptr` que se borra antes de volver a usarse no necesita caso aparte: la validación del parser impide un `use` posterior, así que ya no tiene usos futuros.
+- Comprobación: sobre 10 semillas de 600 operaciones, OPT nunca tiene más fallos, tiempo ni thrashing que FIFO, SC, LRU o LFU.
 
 ### 2026-10-10 - Diseño de la MMU y de la interfaz de algoritmos
 
