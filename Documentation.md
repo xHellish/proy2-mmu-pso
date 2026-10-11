@@ -39,13 +39,47 @@ JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como arch
 
 ## Pendiente
 
-- Parser, generador y exportación.
+- Generador y botón de descarga en la UI.
 - MMU, reloj y métricas.
 - Algoritmos FIFO, SC, LRU, LFU y OPT.
 - UI de preparación y de simulación.
-- Reglas a decidir y documentar: desempate de LFU, si `freq` se reinicia al bajar a disco, ptr de más de 100 páginas.
+- Implementar en el motor las reglas ya decididas (ver Decision Log): autodesalojo en `ptr` de más de 100 páginas, desempate y reinicio de `freq` en LFU, y columna MARK solo para SC.
 
 ## Decision Log
+
+### 2026-10-10 - Parser tolerante en el formato y estricto en las reglas
+
+- Formato tolerado: espacios, tabulaciones, líneas vacías, `\r\n`, BOM, mayúsculas, operaciones separadas por comas en una misma línea y comentarios `//` como los del enunciado.
+- Cualquier otro texto en el archivo es un error explícito, para no ignorar en silencio una operación mal escrita.
+- Los `ptr` se numeran por orden de aparición de cada `new`, empezando en 1.
+- Modelo de operación: `{ type, pid, ptr, size }`. `new` trae su `ptr` asignado y `size`. `use` y `delete` traen el `pid` dueño, resuelto desde el `ptr`, porque el archivo no lo incluye. `kill` solo usa `pid`.
+- `parse_operations` valida las reglas del enunciado al terminar. Rechaza `use` o `delete` de un `ptr` inexistente o ya borrado, cualquier operación de un proceso después de su `kill`, un segundo `kill` y un `new` con `ptr` no secuencial.
+- Riesgo asumido: si el archivo del profesor rompiera una de esas reglas, el simulador lo rechazaría con un mensaje que indica la operación.
+- `serialize_operations` escribe una operación por línea, con salto de línea final, y es la inversa exacta de `parse_operations` para el Anexo 1.
+
+### 2026-10-09 - Columna MARK solo se llena en Second Chance
+
+- La columna MARK aparece siempre en la tabla de la MMU, como en el Anexo 2 del enunciado, para ambos paneles.
+- En SC muestra el bit de referencia (`ref_bit`: 0 o 1).
+- En OPT, FIFO, LRU y LFU se muestra vacía (`-`), porque esos algoritmos no usan el bit.
+- El motor puede mantener `ref_bit` en todas las páginas, pero solo SC lo consulta para decidir.
+
+### 2026-10-09 - Reglas de LFU: desempate FIFO y freq se reinicia al desalojar
+
+- Desempate: ante igual `freq`, se desaloja la página con menor `loaded_at` (la más antigua en RAM).
+- `freq` cuenta los accesos mientras la página está en RAM. Una página recién cargada empieza en 1 (cuenta el acceso que la trajo).
+- Al desalojar una página a disco, `freq` se reinicia a 0.
+- Motivo: así una página muy usada en el pasado, pero ya fría, no queda protegida para siempre al volver a RAM.
+
+### 2026-10-09 - Autodesalojo para un ptr de más de 100 páginas
+
+- Un `new` de más de 400 KB (más de 100 páginas) no cabe entero en RAM. El enunciado no dice qué hacer y el archivo del profesor puede incluirlo.
+- Regla: las páginas se cargan una por una con el ciclo normal. Si no hay marco libre, el algoritmo desaloja una víctima, que puede ser otra página del mismo `ptr`.
+- Candidatos a víctima: todas las páginas en RAM, excepto la que se está cargando en ese momento.
+- Reloj: cada página de `new` y de `use` que se trae suma 5 s y cuenta como thrashing, igual que cualquier fallo.
+- OPT: las páginas del mismo `ptr` tienen la misma distancia futura, así que el desempate es FIFO (menor `loaded_at`).
+- El parser acepta estos tamaños, pero el generador no los produce, para no distorsionar las comparaciones.
+- Ejemplo con FIFO: `new(1,410000)` crea 101 páginas, suma 505 s y fragmentación de 3696 B, y deja una página en disco. Un `use(1)` posterior falla en las 101 páginas.
 
 ### 2026-10-08 - Stack JavaScript vanilla sin dependencias
 

@@ -29,6 +29,6 @@ __pycache__/
 .ruff_cache/
 
 # Especificacion y lista de tareas personal
-spec.md
-plan_implementacion.md
-Proyecto 2 - PSO.pdf
+docs/spec.md
+docs/plan_implementacion.md
+docs/Proyecto 2 - PSO.pdf

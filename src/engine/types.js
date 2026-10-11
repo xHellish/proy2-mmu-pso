@@ -21,15 +21,15 @@ export const OPERATION_TYPES = ["new", "use", "delete", "kill"];
 // Fabricas de datos
 // ---------------------------------------------
 
-// Crea una operacion; para new el valor es el size, para use/delete el ptr y para kill el pid
-export function create_operation(type, pid, value) {
+// Crea una operacion: new usa pid, ptr asignado y size; use/delete usan pid dueno y ptr; kill solo pid
+export function create_operation(type, pid, ptr, size) {
   // Paso 1: validar el tipo de operacion
   if (!OPERATION_TYPES.includes(type)) {
     throw new Error(`Invalid operation type: ${type}`);
   }
 
   // Paso 2: armar la operacion
-  return { type, pid, value };
+  return { type, pid, ptr, size };
 }
 
 // Crea una pagina nueva con los datos que necesitan todos los algoritmos
