@@ -200,6 +200,17 @@ export function create_mmu(algorithm) {
     }
   }
 
+  // Borra una pagina por completo: libera su marco si estaba en RAM y la quita del sistema
+  function remove_page(page) {
+    if (page.in_ram) {
+      frames[page.frame] = null;
+      page.in_ram = false;
+      page.frame = null;
+      algorithm.on_unload(page);
+    }
+    pages.delete(page.id);
+  }
+
   // use: garantiza que todas las paginas del ptr esten en RAM, una por una
   function use_operation(pid, ptr, context) {
     // Paso 1: el ptr debe estar en la tabla de simbolos del proceso
@@ -215,6 +226,48 @@ export function create_mmu(algorithm) {
         load_page(page, context);
       }
     }
+  }
+
+  // delete: borra las paginas del ptr y lo elimina del mapa de memoria; no suma al reloj
+  function delete_operation(pid, ptr) {
+    // Paso 1: el ptr debe estar en la tabla de simbolos del proceso
+    assert_owns_ptr(pid, ptr);
+
+    // Paso 2: borrar cada pagina, en RAM o en disco
+    for (const page of memory_map.get(ptr)) {
+      remove_page(page);
+    }
+
+    // Paso 3: quitar el ptr del mapa, de la tabla de simbolos y de la fragmentacion
+    memory_map.delete(ptr);
+    symbol_table.get(pid).delete(ptr);
+    stats.fragmentation_bytes -= fragmentation_by_ptr.get(ptr);
+    fragmentation_by_ptr.delete(ptr);
+  }
+
+  // kill: borra todos los ptr del proceso y lo marca como terminado; no suma al reloj
+  function kill_operation(pid) {
+    // Paso 1: un proceso solo se puede matar una vez
+    if (killed_pids.has(pid)) {
+      throw new Error(`Process ${pid} was already killed`);
+    }
+
+    // Paso 2: copiar los ptr del proceso para poder borrarlos sin modificar el conjunto en el ciclo
+    const owned_ptrs = symbol_table.get(pid);
+    if (owned_ptrs !== undefined) {
+      const ptr_list = [];
+      for (const ptr of owned_ptrs) {
+        ptr_list.push(ptr);
+      }
+      for (const ptr of ptr_list) {
+        delete_operation(pid, ptr);
+      }
+      symbol_table.delete(pid);
+    }
+
+    // Paso 3: marcar el proceso como terminado
+    killed_pids.add(pid);
+    active_pids.delete(pid);
   }
 
   // =============================================
@@ -290,14 +343,19 @@ export function create_mmu(algorithm) {
 
     // Paso 2: despachar segun el tipo de operacion
     if (operation.type === "new") {
-      result = new_operation(operation.pid, operation.size, context);
-      if (result !== operation.ptr) {
-        throw new Error(`MMU assigned ptr ${result} but the operation expects ptr ${operation.ptr}`);
+      // El ptr se valida antes de tocar el estado, para no dejar paginas a medias
+      if (operation.ptr !== next_ptr) {
+        throw new Error(`Operation expects ptr ${operation.ptr} but the next ptr to assign is ${next_ptr}`);
       }
+      result = new_operation(operation.pid, operation.size, context);
     } else if (operation.type === "use") {
       use_operation(operation.pid, operation.ptr, context);
+    } else if (operation.type === "delete") {
+      delete_operation(operation.pid, operation.ptr);
+    } else if (operation.type === "kill") {
+      kill_operation(operation.pid);
     } else {
-      throw new Error(`Operation ${operation.type} is not implemented yet`);
+      throw new Error(`Unknown operation type: ${operation.type}`);
     }
 
     // Paso 3: contar la operacion ejecutada

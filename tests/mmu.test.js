@@ -222,14 +222,14 @@ test("new rejects an operation whose ptr does not match the assigned one", () =>
 
   assert.throws(
     () => mmu.execute(create_operation("new", 1, 7, 10)),
-    /assigned ptr 1 but the operation expects ptr 7/,
+    /expects ptr 7 but the next ptr to assign is 1/,
   );
 });
 
-test("execute rejects operations that are not implemented yet", () => {
+test("execute rejects an unknown operation type", () => {
   const mmu = create_mmu(create_fifo_algorithm());
 
-  assert.throws(() => mmu.execute(create_operation("delete", 1, 1, null)), /not implemented yet/);
+  assert.throws(() => mmu.execute({ type: "free", pid: 1, ptr: 1, size: null }), /Unknown operation type: free/);
 });
 
 // =============================================
@@ -299,4 +299,123 @@ test("use rejects a ptr that the process does not own", () => {
 
   assert.throws(() => mmu.execute(create_operation("use", 2, 1, null)), /Process 2 does not own ptr 1/);
   assert.throws(() => mmu.execute(create_operation("use", 1, 9, null)), /Process 1 does not own ptr 9/);
+});
+
+// =============================================
+// Operacion delete
+// ---------------------------------------------
+
+test("delete frees the frames and removes the pages without charging the clock", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 500));
+  mmu.execute(create_operation("new", 1, 2, 2 * PAGE_SIZE_BYTES));
+
+  mmu.execute(create_operation("delete", 1, 1, null));
+  const metrics = mmu.get_metrics();
+
+  assert.equal(mmu.get_pages().length, 2);
+  assert.equal(mmu.get_frames()[0], null);
+  assert.equal(metrics.loaded_pages, 2);
+  assert.equal(metrics.clock_seconds, 15);
+  assert.equal(metrics.fragmentation_bytes, 0);
+  assert.equal(metrics.active_processes, 1);
+});
+
+test("delete subtracts only the fragmentation of the deleted ptr", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 500));
+  mmu.execute(create_operation("new", 1, 2, 1000));
+  assert.equal(mmu.get_metrics().fragmentation_bytes, 3596 + 3096);
+
+  mmu.execute(create_operation("delete", 1, 1, null));
+
+  assert.equal(mmu.get_metrics().fragmentation_bytes, 3096);
+});
+
+test("delete also removes pages that are on disk", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, PAGE_SIZE_BYTES));
+  mmu.execute(create_operation("new", 2, 2, RAM_PAGES * PAGE_SIZE_BYTES));
+  assert.equal(mmu.get_metrics().unloaded_pages, 1);
+
+  mmu.execute(create_operation("delete", 1, 1, null));
+  const metrics = mmu.get_metrics();
+
+  assert.equal(metrics.unloaded_pages, 0);
+  assert.equal(metrics.loaded_pages, 100);
+});
+
+test("a deleted ptr cannot be used or deleted again", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 10));
+  mmu.execute(create_operation("delete", 1, 1, null));
+
+  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /Process 1 does not own ptr 1/);
+  assert.throws(() => mmu.execute(create_operation("delete", 1, 1, null)), /Process 1 does not own ptr 1/);
+});
+
+test("ptr values are never reused after a delete", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 10));
+  mmu.execute(create_operation("delete", 1, 1, null));
+
+  assert.equal(mmu.execute(create_operation("new", 1, 2, 10)), 2);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 1, 10)), /next ptr to assign is 3/);
+});
+
+test("a new rejected for its ptr does not change the MMU state", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 10));
+  const metrics_before = mmu.get_metrics();
+
+  assert.throws(() => mmu.execute(create_operation("new", 1, 9, 10)), /next ptr to assign/);
+
+  assert.deepEqual(mmu.get_metrics(), metrics_before);
+  assert.equal(mmu.get_pages().length, 1);
+});
+
+// =============================================
+// Operacion kill
+// ---------------------------------------------
+
+test("kill frees every ptr of the process and keeps the others", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 500));
+  mmu.execute(create_operation("new", 2, 2, 500));
+  mmu.execute(create_operation("new", 1, 3, 2 * PAGE_SIZE_BYTES));
+
+  mmu.execute(create_operation("kill", 1, null, null));
+  const metrics = mmu.get_metrics();
+  const remaining = mmu.get_pages();
+
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0].pid, 2);
+  assert.equal(metrics.active_processes, 1);
+  assert.equal(metrics.loaded_pages, 1);
+  assert.equal(metrics.fragmentation_bytes, 3596);
+  assert.equal(metrics.clock_seconds, 20);
+});
+
+test("kill does not require the process to own anything", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+
+  assert.doesNotThrow(() => mmu.execute(create_operation("kill", 5, null, null)));
+  assert.equal(mmu.get_metrics().active_processes, 0);
+});
+
+test("a killed process cannot be killed again or request memory", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 10));
+  mmu.execute(create_operation("kill", 1, null, null));
+
+  assert.throws(() => mmu.execute(create_operation("kill", 1, null, null)), /Process 1 was already killed/);
+  assert.throws(() => mmu.execute(create_operation("new", 1, 2, 10)), /was already killed, it cannot request memory/);
+});
+
+test("the ptr of a killed process cannot be used", () => {
+  const mmu = create_mmu(create_fifo_algorithm());
+  mmu.execute(create_operation("new", 1, 1, 10));
+  mmu.execute(create_operation("kill", 1, null, null));
+
+  assert.throws(() => mmu.execute(create_operation("use", 1, 1, null)), /Process 1 does not own ptr 1/);
 });
