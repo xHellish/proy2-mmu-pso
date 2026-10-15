@@ -4,8 +4,14 @@
   "description": "Simulador de paginacion de memoria (MMU) para el Proyecto 2 de Sistemas Operativos",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "node --test",
-    "start": "python3 -m http.server 8080"
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
   }
 }

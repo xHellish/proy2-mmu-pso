@@ -17,9 +17,12 @@ Simulador de una MMU con paginación para el Proyecto 2 de Sistemas Operativos. 
 
 ## Arquitectura
 
-El motor es JavaScript puro, sin UI, y la interfaz solo lee su estado.
+El motor es JavaScript puro, sin UI, y la interfaz solo lee su estado. Un servidor Express entrega el sitio y no participa en la simulación.
 
 ```
+server/
+  app.js          create_app: Express con los archivos estáticos de src/, redirección de la raíz y errores
+  index.js        Arranque: lee PORT, escucha y se apaga con SIGINT y SIGTERM
 src/engine/
   types.js        Constantes y fábricas (operación, página)
   rng.js          PRNG con semilla (mulberry32)
@@ -40,6 +43,19 @@ src/ui/
 ```
 
 Lo que no toca el DOM (`simulator.js`, `scenario.js`, `format.js`, el cálculo de filas visibles de `virtual_table.js` y `colors.js`) tiene tests con `node:test`. El código del DOM se verificó abriendo la página en un navegador.
+
+### Servidor
+
+`create_app()` en `server/app.js` arma una aplicación Express con cuatro piezas, en este orden:
+
+1. Encabezados `X-Content-Type-Options: nosniff` y `Referrer-Policy: no-referrer`; se oculta `X-Powered-By`.
+2. La ruta `/` redirige a `ui/` conservando los parámetros de la URL (`?seed=1&algorithm=LRU&autostart=1`). La redirección es relativa para que funcione si el sitio vive bajo un prefijo.
+3. `express.static` sobre la carpeta `src/`. Solo se publica el motor y la interfaz; `package.json`, los tests, los ejemplos y `node_modules` devuelven 404.
+4. Respuestas de error en español: 404 "Página no encontrada" y 500 "Error interno del servidor", con el detalle registrado en la consola del servidor.
+
+`server/index.js` lee el puerto de la variable `PORT` (3000 por defecto, entre 1 y 65535) y termina con un mensaje de una línea si el puerto es inválido o está ocupado. Con SIGINT o SIGTERM cierra el servidor y sale con código 0.
+
+El navegador pide el JavaScript como módulos ES, así que el servidor debe responder con tipo `text/javascript`. Un test recorre todos los `import` desde `main.js`, como hace el navegador, y comprueba que cada módulo se carga con el tipo correcto.
 
 ### Simulador coordinado
 
@@ -98,13 +114,24 @@ Todo algoritmo expone `on_load(page, context)`, `on_access(page, context)`, `on_
 
 ## Stack
 
-JavaScript ESM sin dependencias. Tests con `node:test`. La UI se sirve como archivos estáticos.
+HTML y CSS planos, JavaScript nativo en el navegador y Express como único servidor y única dependencia. Tests con `node:test`, incluidos los del servidor.
 
 ## Pendiente
 
 - Entrega técnica (Fase 7) e informe (Fase 8).
 
 ## Decision Log
+
+### 2026-10-14 - Express como servidor y simulación en el navegador
+
+- Stack final: HTML y CSS planos, JavaScript nativo en el navegador y Express. Express es la única dependencia y no hay frameworks ni herramientas de build.
+- Express solo entrega archivos estáticos. La simulación sigue corriendo en el navegador, porque el enunciado exige una visualización en vivo y poder pausar y reanudar en cualquier momento. Con HTML y CSS solos eso solo sería posible recargando la página desde el servidor, con parpadeo y con una simulación por visitante guardada en el servidor.
+- Alternativa descartada: ejecutar el motor en el servidor y exponer una API. Duplicaría el estado por usuario y obligaría a reescribir la capa de simulación sin ganar nada.
+- Se publica únicamente `src/`. Es más seguro que servir la raíz del proyecto y mantiene las rutas de los módulos (`../engine/...`) intactas.
+- La raíz `/` redirige a `ui/` con ruta relativa, para que el sitio funcione también detrás de un prefijo de URL.
+- El servidor necesita Node 18 o superior, que es la versión de Debian 12, y se instala con `npm install`.
+- Un sitio con Express necesita un host que ejecute Node. Un hosting de archivos estáticos como GitHub Pages no sirve para el servidor, aunque el contenido de `src/` sí funcionaría allí.
+- Se probó en Firefox 157: la raíz redirige con los parámetros, arranca la simulación, carga todos los módulos, y con P=100 y N=5000 llega al final en 160 ms.
 
 ### 2026-10-11 - Fase 6: OPT por página, casos borde y límites
 

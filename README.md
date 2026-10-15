@@ -6,26 +6,36 @@ Simulador de paginación de memoria para el Proyecto 2 de Sistemas Operativos. C
 
 ## Stack
 
-- JavaScript con módulos ESM, sin dependencias externas.
-- UI en HTML, CSS y JavaScript nativo.
+- HTML y CSS planos, sin frameworks ni herramientas de build.
+- JavaScript nativo (módulos ESM) en el navegador: el motor de simulación y la interfaz corren en el cliente.
+- Express como único servidor y única dependencia. Solo entrega los archivos estáticos.
 - Tests con el runner integrado de Node (`node:test`).
 
 ## Requisitos
 
-- Node.js 20 o superior.
-- Python 3 (solo para servir los archivos estáticos).
+- Node.js 18 o superior y npm.
+- Un navegador moderno. Se probó en Firefox.
+
+En Debian:
+
+```
+sudo apt install nodejs npm
+```
 
 ## Instalación y ejecución
 
-No hay dependencias que instalar.
-
 ```
-# Correr los tests del motor
-npm test
+# Instalar Express
+npm install
 
-# Servir la interfaz y abrir http://localhost:8080/src/ui/index.html
+# Iniciar el servidor y abrir http://localhost:3000
 npm start
+
+# Correr los tests
+npm test
 ```
+
+El puerto por defecto es 3000. Para cambiarlo: `PORT=8080 npm start`.
 
 ## Uso
 
@@ -34,17 +44,20 @@ npm start
 3. "Iniciar" abre la simulación: OPT a la izquierda y el algoritmo elegido a la derecha, avanzando una operación en ambos por paso.
 4. Controles: Pausar/Reanudar, Paso, Ir al final y velocidad.
 
-También se puede abrir un escenario directo con la URL, por ejemplo `http://localhost:8080/src/ui/index.html?seed=1&algorithm=LRU&p=10&n=500&autostart=1`.
+También se puede abrir un escenario directo con la URL, por ejemplo `http://localhost:3000/?seed=1&algorithm=LRU&p=10&n=500&autostart=1`.
 
 ## Estructura
 
 ```
+server/           Servidor Express que entrega el sitio
 src/engine/       Motor de la simulación (sin UI)
 src/engine/algorithms/   FIFO, SC, LRU, LFU y OPT
-src/ui/           Interfaz web
-tests/            Tests del motor
+src/ui/           Interfaz web: HTML, CSS y JavaScript
+tests/            Tests del motor y del servidor
 examples/         Archivos de operaciones de ejemplo (Anexo 1)
 ```
+
+El servidor publica solo la carpeta `src/`. El resto del proyecto (tests, ejemplos, configuración) no se sirve.
 
 ## Formato del archivo de operaciones
 
