@@ -70,7 +70,7 @@ src/engine/       Motor de la simulación (sin UI)
 src/engine/algorithms/   FIFO, SC, LRU, LFU y OPT
 src/ui/           Interfaz web: HTML, CSS y JavaScript
 tests/            Tests del motor y del servidor
-examples/         Archivos de operaciones de ejemplo (Anexo 1)
+examples/         Archivos de operaciones de ejemplo: el Anexo 1 y uno con líneas ilegibles y operaciones ilógicas
 ```
 
 El servidor publica solo la carpeta `src/`. El resto del proyecto (tests, ejemplos, configuración) no se sirve.
@@ -78,6 +78,8 @@ El servidor publica solo la carpeta `src/`. El resto del proyecto (tests, ejempl
 ## Formato del archivo de operaciones
 
 Una operación por línea (también se aceptan separadas por comas o punto y coma). Los punteros se numeran por orden de aparición de cada `new`. Un `new` de más de 400 KB crea todas las páginas necesarias; las que no caben en RAM quedan en disco.
+
+Las líneas que no se pueden leer y las operaciones ilógicas (por ejemplo `delete` de un `ptr` que no existe, `use` de un `ptr` borrado o un `kill` repetido) no detienen la simulación: se ignoran, sin consumir tiempo ni cambiar la memoria, y se listan como avisos al cargar el archivo.
 
 ```
 new(1,500)

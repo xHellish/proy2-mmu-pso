@@ -5,6 +5,7 @@
 import { create_element, create_icon } from "./dom.js";
 import { create_panel } from "./panel.js";
 import { create_simulator } from "../engine/simulator.js";
+import { fill_warning_list } from "./warnings.js";
 
 // =============================================
 // Constantes
@@ -95,6 +96,14 @@ export function create_simulation_screen(root_element, on_new_simulation) {
 
   const status = create_element("p", "status_note", "");
   status.hidden = true;
+
+  // Avisos del archivo cargado, plegados para no ocupar espacio
+  const warning_details = create_element("details", "warning_details");
+  const warning_summary = create_element("summary", "", "");
+  const warning_box = create_element("div", "warning_box");
+  warning_details.appendChild(warning_summary);
+  warning_details.appendChild(warning_box);
+  warning_details.hidden = true;
   const error_message = create_element("p", "error", "");
   error_message.setAttribute("role", "alert");
   error_message.hidden = true;
@@ -103,6 +112,7 @@ export function create_simulation_screen(root_element, on_new_simulation) {
   controls.appendChild(main_row);
   controls.appendChild(progress_block);
   controls.appendChild(status);
+  controls.appendChild(warning_details);
   controls.appendChild(error_message);
 
   // Paso 2: contenedor de los dos paneles
@@ -184,9 +194,12 @@ export function create_simulation_screen(root_element, on_new_simulation) {
     progress_text.textContent = `Operación ${snapshot.operation_index} / ${snapshot.total_operations}`;
     if (snapshot.last_operation === null) {
       last_operation_text.textContent = "";
-    } else {
+    } else if (snapshot.last_ignored_reason === null) {
       last_operation_text.textContent = `Última: ${snapshot.last_operation}`;
+    } else {
+      last_operation_text.textContent = `Última: ${snapshot.last_operation} · ignorada: ${snapshot.last_ignored_reason}`;
     }
+    last_operation_text.classList.toggle("ignored", snapshot.last_ignored_reason !== null);
 
     update_buttons(snapshot.finished);
     update_status(snapshot);
@@ -354,7 +367,14 @@ export function create_simulation_screen(root_element, on_new_simulation) {
     title.textContent = `OPT vs ${scenario.algorithm_name}`;
     description.textContent = scenario.description;
 
-    // Paso 3: arrancar corriendo
+    // Paso 3: avisos del archivo, si los hay
+    fill_warning_list(warning_box, scenario.warnings);
+    warning_box.hidden = false;
+    warning_details.open = false;
+    warning_details.hidden = scenario.warnings.length === 0;
+    warning_summary.textContent = `Avisos del archivo (${scenario.warnings.length})`;
+
+    // Paso 4: arrancar corriendo
     resume_simulation();
   }
 

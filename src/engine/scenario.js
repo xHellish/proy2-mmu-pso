@@ -3,7 +3,7 @@
 // ---------------------------------------------
 
 import { generate_operations } from "./generator.js";
-import { parse_operations } from "./parser.js";
+import { read_operations_file } from "./parser.js";
 import { VALID_ALGORITHMS, VALID_PROCESS_COUNTS, VALID_OPERATION_COUNTS } from "./types.js";
 
 // =============================================
@@ -19,12 +19,23 @@ export function build_scenario(options) {
 
   // Paso 2: con archivo, las operaciones salen del archivo y se ignoran semilla, P y N
   if (options.file_text !== null && options.file_text !== undefined) {
-    const operations = parse_operations(options.file_text);
+    const { operations, warnings } = read_operations_file(options.file_text);
+    let ignored_count = 0;
+    for (const operation of operations) {
+      if (operation.ignored_reason !== undefined) {
+        ignored_count++;
+      }
+    }
+    let description = `Archivo de operaciones, ${operations.length} operaciones`;
+    if (ignored_count > 0) {
+      description += ` (${ignored_count} ignoradas)`;
+    }
     return {
       operations,
+      warnings,
       algorithm_name: options.algorithm_name,
       source: "file",
-      description: `Archivo de operaciones, ${operations.length} operaciones`,
+      description,
     };
   }
 
@@ -43,6 +54,7 @@ export function build_scenario(options) {
   const operations = generate_operations(options.seed, options.process_count, options.operation_count);
   return {
     operations,
+    warnings: [],
     algorithm_name: options.algorithm_name,
     source: "generated",
     description: `Semilla ${options.seed}, P=${options.process_count}, N=${options.operation_count}`,

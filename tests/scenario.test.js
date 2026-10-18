@@ -52,10 +52,18 @@ test("builds a scenario from a file and ignores seed, P and N", () => {
   assert.equal(scenario.description, "Archivo de operaciones, 16 operaciones");
 });
 
-test("a file with errors stops the scenario with the parser message", () => {
-  const options = { ...generated_options(), file_text: "new(1,10)\nuse(5)" };
+test("a file with illogical operations builds a scenario that ignores them", () => {
+  const options = { ...generated_options(), file_text: "new(1,10)\nuse(5)\nhola\nkill(1)" };
+  const scenario = build_scenario(options);
 
-  assert.throws(() => build_scenario(options), /el ptr 5 nunca fue creado/);
+  assert.equal(scenario.operations.length, 3);
+  assert.match(scenario.operations[1].ignored_reason, /el ptr 5 nunca fue creado/);
+  assert.equal(scenario.warnings.length, 2);
+  assert.equal(scenario.description, "Archivo de operaciones, 3 operaciones (1 ignoradas)");
+});
+
+test("a generated scenario has no warnings", () => {
+  assert.deepEqual(build_scenario(generated_options()).warnings, []);
 });
 
 test("an empty file stops the scenario", () => {

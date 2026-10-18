@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   parse_operations,
+  read_operations_file,
   validate_operations,
   serialize_operations,
 } from "../src/engine/parser.js";
@@ -98,8 +99,8 @@ test("ignores a leading BOM", () => {
 // Parser: errores de sintaxis
 // ---------------------------------------------
 
-test("rejects text that is not an operation", () => {
-  assert.throws(() => parse_operations("new(1,10)\nhello\nkill(1)"), /Texto inesperado/);
+test("strict mode rejects text that is not an operation", () => {
+  assert.throws(() => parse_operations("new(1,10)\nhello\nkill(1)"), /Línea 2: texto no reconocido "hello"/);
 });
 
 test("rejects an empty file", () => {
@@ -202,6 +203,104 @@ test("validate accepts processes interleaved freely", () => {
   const operations = parse_operations("new(1,10)\nnew(2,10)\nuse(1)\nuse(2)\nkill(2)\nkill(1)");
 
   assert.doesNotThrow(() => validate_operations(operations));
+});
+
+// =============================================
+// Lectura tolerante del archivo
+// ---------------------------------------------
+
+test("skips unreadable lines with a warning and keeps the rest", () => {
+  const text = "new(1,10)\nhola\nborrar(2)\nnew(1)\nuse(-3)\nuse(1)\nkill(1)";
+  const { operations, warnings } = read_operations_file(text);
+
+  assert.deepEqual(
+    operations,
+    [create_operation("new", 1, 1, 10), create_operation("use", 1, 1, null), create_operation("kill", 1, null, null)],
+  );
+  assert.equal(warnings.length, 4);
+  assert.match(warnings[0], /^Línea 2: texto no reconocido "hola"/);
+  assert.match(warnings[1], /^Línea 3: texto no reconocido "borrar\(2\)"/);
+  assert.match(warnings[2], /^Línea 4 \(new\(1\)\): new espera 2 argumentos/);
+  assert.match(warnings[3], /^Línea 5 \(use\(-3\)\): el ptr debe ser un entero no negativo/);
+});
+
+test("marks illogical operations as ignored with their reason", () => {
+  const text = [
+    "new(1,500)",
+    "delete(7)",
+    "use(1)",
+    "delete(1)",
+    "use(1)",
+    "delete(1)",
+    "new(2,100)",
+    "kill(2)",
+    "kill(2)",
+    "use(2)",
+    "new(2,50)",
+    "use(3)",
+    "new(1,10)",
+    "use(4)",
+    "new(3,409600001)",
+    "kill(1)",
+  ].join("\n");
+  const { operations, warnings } = read_operations_file(text);
+
+  // Paso 1: el motivo de cada operacion ignorada, por posicion
+  const expected_reasons = new Map([
+    [1, /el ptr 7 nunca fue creado/],
+    [4, /el ptr 1 ya fue borrado/],
+    [5, /el ptr 1 ya fue borrado/],
+    [8, /el proceso 2 ya terminó con kill/],
+    [9, /el ptr 2 pertenece al proceso 2, que ya terminó con kill/],
+    [10, /el proceso 2 ya terminó con kill/],
+    [11, /el ptr 3 no existe porque su new fue ignorado/],
+    [14, /el máximo permitido es 100000/],
+  ]);
+  for (const [index, operation] of operations.entries()) {
+    if (expected_reasons.has(index)) {
+      assert.match(operation.ignored_reason, expected_reasons.get(index), `operación ${index + 1}`);
+    } else {
+      assert.equal(operation.ignored_reason, undefined, `operación ${index + 1}`);
+    }
+  }
+
+  // Paso 2: un new ignorado consume su ptr, asi que el siguiente new recibe el 4
+  assert.equal(operations[10].ptr, 3);
+  assert.equal(operations[12].ptr, 4);
+
+  // Paso 3: un aviso por operacion ignorada, con su numero, su texto y su linea
+  assert.equal(warnings.length, expected_reasons.size);
+  assert.match(warnings[0], /^Operación 2 \(delete\(7\)\), línea 2: el ptr 7 nunca fue creado, se ignorará$/);
+
+  // Paso 4: la lista con operaciones ignoradas sigue siendo valida para el simulador
+  assert.doesNotThrow(() => validate_operations(operations));
+});
+
+test("the example with invalid operations runs with seven warnings", () => {
+  const text = readFileSync(new URL("../examples/operaciones_invalidas.txt", import.meta.url), "utf8");
+  const { operations, warnings } = read_operations_file(text);
+
+  assert.equal(operations.length, 14);
+  assert.equal(warnings.length, 7);
+  assert.doesNotThrow(() => validate_operations(operations));
+});
+
+test("a file with only illogical operations is still accepted", () => {
+  const { operations, warnings } = read_operations_file("delete(5)\nuse(2)\n");
+
+  assert.equal(operations.length, 2);
+  assert.equal(warnings.length, 2);
+});
+
+test("a file without any readable operation is rejected with the first problem", () => {
+  assert.throws(() => read_operations_file("hola\nmundo"), /no tiene operaciones\. Línea 1: texto no reconocido "hola"/);
+});
+
+test("validate rejects an ignored new with a non sequential ptr", () => {
+  const operation = create_operation("new", 1, 3, 10);
+  operation.ignored_reason = "el proceso 1 ya terminó con kill";
+
+  assert.throws(() => validate_operations([operation]), /se esperaba el ptr 1, se recibió 3/);
 });
 
 // =============================================

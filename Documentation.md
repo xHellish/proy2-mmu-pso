@@ -26,7 +26,7 @@ server/
 src/engine/
   types.js        Constantes y fábricas (operación, página)
   rng.js          PRNG con semilla (mulberry32)
-  parser.js       Archivo -> lista de operaciones
+  parser.js       Archivo -> lista de operaciones y avisos (lo ilegible se salta, lo ilógico se marca como ignorado)
   generator.js    (seed, P, N) -> lista de operaciones válida
   scenario.js     Datos de la pantalla de preparación -> escenario (operaciones + algoritmo)
   mmu.js          MMU genérica que recibe un algoritmo
@@ -39,7 +39,8 @@ src/ui/
   simulation_screen.js  Controles y ciclo de ejecución con requestAnimationFrame
   panel.js              Panel de una MMU: barra de RAM, tabla e indicadores
   virtual_table.js      Tabla que solo dibuja las filas visibles
-  format.js, colors.js, dom.js   Textos, colores por PID y utilidades del DOM
+  warnings.js           Lista de avisos del archivo
+  format.js, colors.js, dom.js   Textos, colores por PID y utilidades del DOM (incluye los íconos SVG)
 ```
 
 Lo que no toca el DOM (`simulator.js`, `scenario.js`, `format.js`, el cálculo de filas visibles de `virtual_table.js` y `colors.js`) tiene tests con `node:test`. El código del DOM se verificó abriendo la página en un navegador.
@@ -63,11 +64,21 @@ El navegador pide el JavaScript como módulos ES, así que el servidor debe resp
 
 ### Interfaz
 
-- **Preparación**: semilla, algoritmo (FIFO, SC, LRU, LFU), P, N y archivo opcional. Con un archivo cargado se ignoran semilla, P y N, y se avisa de cualquier error del archivo antes de iniciar. "Descargar archivo" baja el archivo generado en el formato del Anexo 1.
+- **Preparación**: semilla, algoritmo (FIFO, SC, LRU, LFU), P, N y archivo opcional. Con un archivo cargado se ignoran semilla, P y N. Si el archivo trae líneas ilegibles u operaciones ilógicas, se listan como avisos antes de iniciar y la simulación corre igual. "Descargar archivo" baja el archivo generado en el formato del Anexo 1.
 - **Simulación**: dos paneles lado a lado, OPT a la izquierda. Cada panel tiene la barra de RAM de 100 celdas coloreadas por PID, la tabla de la MMU (PAGE ID, PID, LOADED, L-ADDR, M-ADDR, D-ADDR, LOADED-T, MARK) y los indicadores del enunciado, más hits y fallos.
 - **Controles**: Pausar/Reanudar, Paso, Ir al final y velocidad (1 a 2000 operaciones por segundo). Una insignia indica si la simulación está en ejecución, en pausa o terminada. Al terminar, una nota explica por qué la memoria quedó vacía: el generador termina cada proceso con `kill`.
 - **Estilo**: tema claro con encabezado común, tarjetas y una franja de color por panel (verde para OPT, azul para el algoritmo elegido). Los íconos de los botones son SVG en línea, para no depender de las fuentes del sistema.
 - **URL**: se puede abrir un escenario repetible con `?seed=1&algorithm=LRU&p=10&n=500&autostart=1`. Sirve para repetir una corrida o tomar las capturas del informe.
+
+### Archivo de operaciones
+
+`read_operations_file(text)` devuelve `{ operations, warnings }` y no se detiene en errores:
+
+- **Líneas ilegibles** (texto suelto, instrucción desconocida, argumentos de más o de menos, números inválidos): se saltan con un aviso que indica la línea. No cuentan como operación ni consumen un `ptr`.
+- **Operaciones ilógicas** (`use` o `delete` de un `ptr` inexistente, borrado o de un proceso terminado, `kill` repetido, `new` de un proceso terminado, `new` de más de 100 000 páginas): quedan en la secuencia con `ignored_reason`. La MMU no cambia la memoria ni el reloj con ellas y OPT no las cuenta como uso futuro. Un `new` ignorado igual consume su número de `ptr`, para respetar la numeración por orden de aparición.
+- Solo un archivo sin ninguna operación legible se rechaza.
+
+`parse_operations(text)` es la versión estricta: lanza el primer aviso como error. La usan las pruebas y los ejemplos. `validate_operations` acepta operaciones ignoradas y sigue exigiendo que el resto cumpla las reglas.
 
 ### MMU
 
@@ -119,9 +130,19 @@ HTML y CSS planos, JavaScript nativo en el navegador y Express como único servi
 
 ## Pendiente
 
-- Entrega técnica (Fase 7) e informe (Fase 8).
+- Entregar el informe en PDF con el enlace al sitio publicado (https://proy2-mmu-pso.onrender.com).
 
 ## Decision Log
+
+### 2026-10-18 - Archivos con líneas ilegibles y operaciones ilógicas
+
+- Antes, un archivo con una sola operación ilógica se rechazaba completo. El archivo de pruebas puede incluirlas a propósito para comprobar que el sistema no falla, así que ahora se ignoran con aviso y la simulación sigue. Reemplaza la regla "estricto en las reglas" de la entrada del 2026-10-10.
+- Las operaciones ilógicas quedan en su posición, marcadas con el motivo: así el contador de operaciones coincide con el archivo y la interfaz las muestra cuando les toca. No consumen tiempo ni cambian la memoria en ninguna MMU.
+- Un `new` de un proceso terminado se ignora, pero consume su número de `ptr`. Si no lo consumiera, los `use` siguientes del archivo apuntarían a otro bloque distinto del que cuenta quien escribió el archivo.
+- Las líneas ilegibles no cuentan como operación: no se puede saber qué quisieron decir.
+- Un `new` de más de 100 000 páginas también se ignora, en lugar de rechazar el archivo.
+- La pantalla de preparación lista los avisos al cargar el archivo; la de simulación muestra el motivo junto a la última operación y la lista completa en un panel desplegable.
+- Verificación: una prueba compara un archivo con operaciones ilógicas contra el mismo archivo sin ellas y exige métricas idénticas en todos los algoritmos, OPT incluido. Se probó en Firefox ESR 128 en español.
 
 ### 2026-10-18 - Rediseño visual y controles estables
 

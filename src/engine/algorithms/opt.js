@@ -9,10 +9,10 @@ export function create_opt_algorithm(operations) {
     throw new Error("OPT requiere la lista completa de operaciones");
   }
 
-  // Paso 2: precalcular, por cada ptr, los indices de operacion donde aparece un use
+  // Paso 2: precalcular, por cada ptr, los indices de operacion donde aparece un use que se ejecuta
   const uses_by_ptr = new Map();
   for (const [operation_index, operation] of operations.entries()) {
-    if (operation.type !== "use") {
+    if (operation.type !== "use" || operation.ignored_reason !== undefined) {
       continue;
     }
     if (!uses_by_ptr.has(operation.ptr)) {

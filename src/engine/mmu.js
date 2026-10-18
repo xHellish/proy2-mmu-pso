@@ -347,7 +347,19 @@ export function create_mmu(algorithm) {
     const context = { operation_index: operations_executed };
     let result = null;
 
-    // Paso 2: despachar segun el tipo de operacion
+    // Paso 2: una operacion ignorada no cambia la memoria ni el reloj; un new ignorado igual consume su ptr
+    if (operation.ignored_reason !== undefined) {
+      if (operation.type === "new") {
+        if (operation.ptr !== next_ptr) {
+          throw new Error(`La operación espera el ptr ${operation.ptr} pero el siguiente ptr a asignar es ${next_ptr}`);
+        }
+        next_ptr++;
+      }
+      operations_executed++;
+      return null;
+    }
+
+    // Paso 3: despachar segun el tipo de operacion
     if (operation.type === "new") {
       // El ptr se valida antes de tocar el estado, para no dejar paginas a medias
       if (operation.ptr !== next_ptr) {
@@ -364,7 +376,7 @@ export function create_mmu(algorithm) {
       throw new Error(`Tipo de operación desconocido: ${operation.type}`);
     }
 
-    // Paso 3: contar la operacion ejecutada
+    // Paso 4: contar la operacion ejecutada
     operations_executed++;
     return result;
   }

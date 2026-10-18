@@ -659,3 +659,48 @@ button:disabled {
   font-size: 0.9rem;
   text-align: center;
 }
+
+/* Avisos del archivo: lineas ilegibles y operaciones ignoradas */
+.warning_box {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #f3d38a;
+  border-radius: var(--radius-small);
+  background: var(--paused-soft);
+  color: #6b4000;
+  font-size: 0.85rem;
+}
+
+.warning_title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.warning_list {
+  max-height: 10rem;
+  margin: 0;
+  padding-left: 1.2rem;
+  overflow-y: auto;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, "DejaVu Sans Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.warning_more {
+  font-style: italic;
+}
+
+.warning_details summary {
+  color: var(--paused);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.warning_details[open] summary {
+  margin-bottom: 8px;
+}
+
+.last_operation.ignored {
+  color: var(--paused);
+  white-space: normal;
+}

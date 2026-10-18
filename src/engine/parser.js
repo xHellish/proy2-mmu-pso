@@ -9,24 +9,24 @@ import { create_operation, OPERATION_TYPES, PAGE_SIZE_BYTES, MAX_PAGES_PER_PTR }
 // ---------------------------------------------
 
 const OPERATION_REGEX = /(new|use|delete|kill)\s*\(([^)]*)\)/gi;
-const COMMENT_REGEX = /\/\/[^\n\r]*/g;
+const COMMENT_REGEX = /\/\/.*/g;
 const SEPARATOR_REGEX = /[\s,;]/g;
+const LINE_BREAK_REGEX = /\r\n|\r|\n/;
 const INTEGER_REGEX = /^\d+$/;
+const MAX_QUOTED_LENGTH = 40;
 
 // =============================================
 // Funciones auxiliares
 // ---------------------------------------------
 
 // Convierte un texto a entero no negativo o lanza un error con el contexto
-function parse_integer(raw_value, description, operation_number) {
+function parse_integer(raw_value, description) {
   // Paso 1: quitar espacios alrededor
   const trimmed = raw_value.trim();
 
   // Paso 2: aceptar solo digitos
   if (!INTEGER_REGEX.test(trimmed)) {
-    throw new Error(
-      `Operación ${operation_number}: ${description} debe ser un entero no negativo, se recibió "${trimmed}"`,
-    );
+    throw new Error(`${description} debe ser un entero no negativo, se recibió "${trimmed}"`);
   }
 
   return Number(trimmed);
@@ -39,89 +39,204 @@ function assert_non_negative_integer(value, description, label) {
   }
 }
 
-// Verifica que el tamano no necesite mas paginas que el maximo permitido por ptr
-function assert_size_fits(size, label) {
+// Devuelve el motivo por el que un tamano no cabe en un ptr, o null si cabe
+function get_size_problem(size) {
   const page_count = Math.ceil(size / PAGE_SIZE_BYTES);
   if (page_count > MAX_PAGES_PER_PTR) {
-    throw new Error(
-      `${label}: el tamaño ${size} necesita ${page_count} páginas, el máximo permitido es ${MAX_PAGES_PER_PTR}`,
-    );
+    return `el tamaño ${size} necesita ${page_count} páginas, el máximo permitido es ${MAX_PAGES_PER_PTR}`;
+  }
+  return null;
+}
+
+// Verifica que el tamano no necesite mas paginas que el maximo permitido por ptr
+function assert_size_fits(size, label) {
+  const problem = get_size_problem(size);
+  if (problem !== null) {
+    throw new Error(`${label}: ${problem}`);
   }
 }
 
+// Recorta un texto largo para mostrarlo en un aviso
+function shorten(text) {
+  if (text.length <= MAX_QUOTED_LENGTH) {
+    return text;
+  }
+  return `${text.slice(0, MAX_QUOTED_LENGTH)}...`;
+}
+
+// Convierte una operacion reconocida por la regex en sus valores, o lanza un error de formato
+function parse_match(match) {
+  // Paso 1: tipo y argumentos separados por coma
+  const type = match[1].toLowerCase();
+  const args = match[2].split(",");
+
+  // Paso 2: new(pid, size) recibe dos argumentos
+  if (type === "new") {
+    if (args.length !== 2) {
+      throw new Error(`new espera 2 argumentos (pid, size), recibió ${args.length}`);
+    }
+    return {
+      type,
+      pid: parse_integer(args[0], "el pid"),
+      size: parse_integer(args[1], "el tamaño"),
+      ptr: null,
+    };
+  }
+
+  // Paso 3: use(ptr), delete(ptr) y kill(pid) reciben un solo argumento
+  if (args.length !== 1) {
+    throw new Error(`${type} espera 1 argumento, recibió ${args.length}`);
+  }
+  if (type === "kill") {
+    return { type, pid: parse_integer(args[0], "el pid"), size: null, ptr: null };
+  }
+  return { type, pid: null, size: null, ptr: parse_integer(args[0], "el ptr") };
+}
+
+// Crea el estado de las reglas del enunciado que se acumula al leer el archivo
+function create_rules_state() {
+  return {
+    next_ptr: 1,
+    owner_by_ptr: new Map(),
+    deleted_ptrs: new Set(),
+    killed_pids: new Set(),
+    ignored_new_ptrs: new Set(),
+  };
+}
+
+// Devuelve el motivo por el que un use o delete no se puede ejecutar, o null si es valido
+function get_ptr_problem(ptr, state) {
+  if (state.ignored_new_ptrs.has(ptr)) {
+    return `el ptr ${ptr} no existe porque su new fue ignorado`;
+  }
+  if (!state.owner_by_ptr.has(ptr)) {
+    return `el ptr ${ptr} nunca fue creado`;
+  }
+  const owner_pid = state.owner_by_ptr.get(ptr);
+  if (state.killed_pids.has(owner_pid)) {
+    return `el ptr ${ptr} pertenece al proceso ${owner_pid}, que ya terminó con kill`;
+  }
+  if (state.deleted_ptrs.has(ptr)) {
+    return `el ptr ${ptr} ya fue borrado`;
+  }
+  return null;
+}
+
+// Aplica las reglas del enunciado a una operacion leida; si no se puede ejecutar la marca como ignorada
+function apply_rules(parsed, state) {
+  // Paso 1: new consume siempre el siguiente ptr, para respetar la numeracion por orden de aparicion
+  if (parsed.type === "new") {
+    const ptr = state.next_ptr;
+    state.next_ptr++;
+    const operation = create_operation("new", parsed.pid, ptr, parsed.size);
+    let reason = get_size_problem(parsed.size);
+    if (state.killed_pids.has(parsed.pid)) {
+      reason = `el proceso ${parsed.pid} ya terminó con kill`;
+    }
+    if (reason !== null) {
+      operation.ignored_reason = reason;
+      state.ignored_new_ptrs.add(ptr);
+      return operation;
+    }
+    state.owner_by_ptr.set(ptr, parsed.pid);
+    return operation;
+  }
+
+  // Paso 2: kill solo se puede usar una vez por proceso
+  if (parsed.type === "kill") {
+    const operation = create_operation("kill", parsed.pid, null, null);
+    if (state.killed_pids.has(parsed.pid)) {
+      operation.ignored_reason = `el proceso ${parsed.pid} ya terminó con kill`;
+      return operation;
+    }
+    state.killed_pids.add(parsed.pid);
+    return operation;
+  }
+
+  // Paso 3: use y delete toman el pid dueno desde el ptr (null si no existe) y solo aplican a un ptr vivo
+  let owner_pid = state.owner_by_ptr.get(parsed.ptr);
+  if (owner_pid === undefined) {
+    owner_pid = null;
+  }
+  const operation = create_operation(parsed.type, owner_pid, parsed.ptr, null);
+  const reason = get_ptr_problem(parsed.ptr, state);
+  if (reason !== null) {
+    operation.ignored_reason = reason;
+    return operation;
+  }
+  if (parsed.type === "delete") {
+    state.deleted_ptrs.add(parsed.ptr);
+  }
+  return operation;
+}
+
 // =============================================
-// Parser del archivo de operaciones
+// Lectura del archivo de operaciones
 // ---------------------------------------------
 
-// Convierte el texto del archivo (Anexo 1) en una lista de operaciones validada
-export function parse_operations(text) {
-  // Paso 1: validar la entrada y limpiar BOM y comentarios //
+// Lee el archivo (Anexo 1) sin detenerse en errores: salta lo ilegible y marca lo ilogico como ignorado
+export function read_operations_file(text) {
+  // Paso 1: validar la entrada y quitar el BOM
   if (typeof text !== "string") {
     throw new Error("El texto de operaciones debe ser una cadena");
   }
-  const cleaned = text.replace(/^﻿/, "").replace(COMMENT_REGEX, "");
+  const lines = text.replace(/^﻿/, "").split(LINE_BREAK_REGEX);
 
-  // Paso 2: rechazar cualquier texto que no sea una operacion, coma, punto y coma o espacio
-  const leftover = cleaned.replace(OPERATION_REGEX, "").replace(SEPARATOR_REGEX, "");
-  if (leftover.length > 0) {
-    throw new Error(`Texto inesperado en el archivo de operaciones: "${leftover.slice(0, 30)}"`);
-  }
-
-  // Paso 3: recorrer las operaciones en orden de aparicion
   const operations = [];
-  const owner_by_ptr = new Map();
-  let next_ptr = 1;
+  const warnings = [];
+  const state = create_rules_state();
 
-  for (const match of cleaned.matchAll(OPERATION_REGEX)) {
-    const operation_number = operations.length + 1;
-    const type = match[1].toLowerCase();
-    const args = match[2].split(",");
+  // Paso 2: recorrer el archivo linea por linea
+  for (const [line_index, raw_line] of lines.entries()) {
+    const line_number = line_index + 1;
+    const line = raw_line.replace(COMMENT_REGEX, "");
 
-    // Paso 3.1: new(pid, size) recibe el siguiente ptr por orden de aparicion
-    if (type === "new") {
-      if (args.length !== 2) {
-        throw new Error(
-          `Operación ${operation_number}: new espera 2 argumentos (pid, size), recibió ${args.length}`,
+    // Paso 2.1: el texto que no es una operacion ni un separador se salta con aviso
+    const leftover = line.replace(OPERATION_REGEX, "").replace(SEPARATOR_REGEX, "");
+    if (leftover.length > 0) {
+      warnings.push(`Línea ${line_number}: texto no reconocido "${shorten(leftover)}", se ignoró`);
+    }
+
+    // Paso 2.2: cada operacion de la linea; si su formato es invalido se salta con aviso
+    for (const match of line.matchAll(OPERATION_REGEX)) {
+      let parsed = null;
+      try {
+        parsed = parse_match(match);
+      } catch (error) {
+        warnings.push(`Línea ${line_number} (${shorten(match[0].trim())}): ${error.message}, se ignoró`);
+        continue;
+      }
+
+      // Paso 2.3: una operacion ilogica queda en la secuencia, marcada como ignorada
+      const operation = apply_rules(parsed, state);
+      operations.push(operation);
+      if (operation.ignored_reason !== undefined) {
+        warnings.push(
+          `Operación ${operations.length} (${serialize_operation(operation)}), línea ${line_number}: ${operation.ignored_reason}, se ignorará`,
         );
       }
-      const pid = parse_integer(args[0], "el pid", operation_number);
-      const size = parse_integer(args[1], "el tamaño", operation_number);
-      operations.push(create_operation("new", pid, next_ptr, size));
-      owner_by_ptr.set(next_ptr, pid);
-      next_ptr++;
-      continue;
     }
-
-    // Paso 3.2: use(ptr), delete(ptr) y kill(pid) reciben un solo argumento
-    if (args.length !== 1) {
-      throw new Error(
-        `Operación ${operation_number}: ${type} espera 1 argumento, recibió ${args.length}`,
-      );
-    }
-
-    if (type === "kill") {
-      const pid = parse_integer(args[0], "el pid", operation_number);
-      operations.push(create_operation("kill", pid, null, null));
-      continue;
-    }
-
-    // Paso 3.3: use/delete toman el pid dueno desde el ptr (null si el ptr no existe)
-    const ptr = parse_integer(args[0], "el ptr", operation_number);
-    let owner_pid = owner_by_ptr.get(ptr);
-    if (owner_pid === undefined) {
-      owner_pid = null;
-    }
-    operations.push(create_operation(type, owner_pid, ptr, null));
   }
 
-  // Paso 4: un archivo sin operaciones no es valido
+  // Paso 3: un archivo sin ninguna operacion legible no es valido
   if (operations.length === 0) {
-    throw new Error("El archivo de operaciones no tiene operaciones");
+    let message = "El archivo de operaciones no tiene operaciones";
+    if (warnings.length > 0) {
+      message += `. ${warnings[0]}`;
+    }
+    throw new Error(message);
   }
 
-  // Paso 5: validar las reglas del enunciado antes de devolver
-  validate_operations(operations);
-  return operations;
+  return { operations, warnings };
+}
+
+// Lee el archivo en modo estricto: cualquier aviso es un error (lo usan las pruebas y los ejemplos)
+export function parse_operations(text) {
+  const result = read_operations_file(text);
+  if (result.warnings.length > 0) {
+    throw new Error(result.warnings[0]);
+  }
+  return result.operations;
 }
 
 // =============================================
@@ -143,6 +258,20 @@ export function validate_operations(operations) {
   // Paso 2: revisar cada operacion contra el estado acumulado
   for (const [index, operation] of operations.entries()) {
     const label = `Operación ${index + 1} (${serialize_operation(operation)})`;
+
+    // Paso 2.0: una operacion ignorada no se ejecuta, pero un new ignorado igual consume su ptr
+    if (operation.ignored_reason !== undefined) {
+      if (typeof operation.ignored_reason !== "string" || operation.ignored_reason.length === 0) {
+        throw new Error(`${label}: el motivo para ignorarla debe ser un texto no vacío`);
+      }
+      if (operation.type === "new") {
+        if (operation.ptr !== expected_ptr) {
+          throw new Error(`${label}: se esperaba el ptr ${expected_ptr}, se recibió ${operation.ptr}`);
+        }
+        expected_ptr++;
+      }
+      continue;
+    }
 
     // Paso 2.1: new debe ser de un proceso vivo y traer el ptr secuencial
     if (operation.type === "new") {

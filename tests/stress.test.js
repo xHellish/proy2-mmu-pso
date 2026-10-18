@@ -8,7 +8,7 @@ import { create_mmu } from "../src/engine/mmu.js";
 import { create_simulator } from "../src/engine/simulator.js";
 import { create_algorithm, create_opt_algorithm } from "../src/engine/algorithms/index.js";
 import { generate_operations } from "../src/engine/generator.js";
-import { parse_operations, serialize_operations } from "../src/engine/parser.js";
+import { parse_operations, read_operations_file, serialize_operations } from "../src/engine/parser.js";
 import { create_rng, random_int } from "../src/engine/rng.js";
 import {
   VALID_ALGORITHMS,
@@ -337,6 +337,41 @@ test("a 1 MB block creates all its pages and sends the ones that do not fit to d
     mmu.execute(operations[2]);
     assert.equal(mmu.get_pages().length, 0, name);
   }
+});
+
+test("illogical operations do not change any result for any algorithm", () => {
+  // El archivo sucio trae operaciones ilogicas; el limpio es el mismo sin ellas (el new ignorado consume el ptr 3)
+  const dirty = read_operations_file([
+    "new(1,500)", "delete(9)", "new(2,9000)", "use(1)", "use(2)", "delete(1)", "use(1)",
+    "kill(2)", "new(2,100)", "use(3)", "kill(2)", "new(1,20000)", "use(4)", "use(4)", "kill(1)", "kill(1)",
+  ].join("\n")).operations;
+  const clean = parse_operations([
+    "new(1,500)", "new(2,9000)", "use(1)", "use(2)", "delete(1)",
+    "kill(2)", "new(1,20000)", "use(3)", "use(3)", "kill(1)",
+  ].join("\n"));
+
+  for (const name of VALID_ALGORITHMS) {
+    const dirty_simulator = create_simulator(name, dirty);
+    const clean_simulator = create_simulator(name, clean);
+    dirty_simulator.step_many(dirty.length);
+    clean_simulator.step_many(clean.length);
+    const dirty_snapshot = dirty_simulator.get_snapshot();
+    const clean_snapshot = clean_simulator.get_snapshot();
+    assert.deepEqual(dirty_snapshot.opt.metrics, clean_snapshot.opt.metrics, `OPT con ${name}`);
+    assert.deepEqual(dirty_snapshot.selected.metrics, clean_snapshot.selected.metrics, name);
+    assert.equal(dirty_snapshot.last_ignored_reason, "el proceso 1 ya terminó con kill", name);
+  }
+});
+
+test("an ignored operation leaves the MMU exactly as it was", () => {
+  const operations = read_operations_file("new(1,500)\nuse(1)\ndelete(7)").operations;
+  const mmu = create_mmu(make_algorithm("LRU", operations));
+  mmu.execute(operations[0]);
+  mmu.execute(operations[1]);
+  const before = { metrics: mmu.get_metrics(), pages: mmu.get_pages(), frames: mmu.get_frames() };
+
+  assert.equal(mmu.execute(operations[2]), null);
+  assert.deepEqual({ metrics: mmu.get_metrics(), pages: mmu.get_pages(), frames: mmu.get_frames() }, before);
 });
 
 // =============================================

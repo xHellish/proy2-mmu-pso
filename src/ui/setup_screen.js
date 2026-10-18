@@ -3,7 +3,8 @@
 // ---------------------------------------------
 
 import { build_scenario } from "../engine/scenario.js";
-import { parse_operations, serialize_operations } from "../engine/parser.js";
+import { read_operations_file, serialize_operations } from "../engine/parser.js";
+import { fill_warning_list } from "./warnings.js";
 import { VALID_ALGORITHMS, VALID_PROCESS_COUNTS, VALID_OPERATION_COUNTS } from "../engine/types.js";
 
 // =============================================
@@ -51,6 +52,7 @@ export function create_setup_screen(on_start) {
   const file_input = get_element("file_input");
   const clear_file_button = get_element("clear_file_button");
   const file_status = get_element("file_status");
+  const file_warnings = get_element("file_warnings");
   const download_button = get_element("download_button");
   const setup_error = get_element("setup_error");
 
@@ -114,6 +116,7 @@ export function create_setup_screen(on_start) {
     loaded_file = null;
     file_input.value = "";
     file_status.textContent = NO_FILE_MESSAGE;
+    fill_warning_list(file_warnings, []);
     set_generation_controls_disabled(false);
   }
 
@@ -127,11 +130,15 @@ export function create_setup_screen(on_start) {
     }
 
     try {
+      // Paso 1: leer el archivo; lo ilegible o ilogico no lo invalida, solo genera avisos
       const text = await file.text();
-      const operations = parse_operations(text);
+      const { operations, warnings } = read_operations_file(text);
       loaded_file = { name: file.name, text };
       file_status.textContent = `Cargado ${file.name}: ${operations.length} operaciones. Se ignoran la semilla, P y N.`;
       set_generation_controls_disabled(true);
+
+      // Paso 2: mostrar lo que se va a ignorar
+      fill_warning_list(file_warnings, warnings);
     } catch (error) {
       console.error(error);
       clear_loaded_file();

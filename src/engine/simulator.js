@@ -68,10 +68,15 @@ export function create_simulator(algorithm_name, operations) {
 
   // Devuelve el estado completo de ambas MMU para dibujarlo
   function get_snapshot() {
-    // Paso 1: la ultima operacion ejecutada, para mostrarla en pantalla
+    // Paso 1: la ultima operacion ejecutada y, si se ignoro, el motivo, para mostrarlos en pantalla
     let last_operation = null;
+    let last_ignored_reason = null;
     if (next_index > 0) {
-      last_operation = serialize_operation(operations[next_index - 1]);
+      const operation = operations[next_index - 1];
+      last_operation = serialize_operation(operation);
+      if (operation.ignored_reason !== undefined) {
+        last_ignored_reason = operation.ignored_reason;
+      }
     }
 
     // Paso 2: armar la foto de ambas MMU
@@ -81,6 +86,7 @@ export function create_simulator(algorithm_name, operations) {
       total_operations: operations.length,
       finished: is_finished(),
       last_operation,
+      last_ignored_reason,
       opt: take_snapshot(opt_mmu),
       selected: take_snapshot(selected_mmu),
     };
