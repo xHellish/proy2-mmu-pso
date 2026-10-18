@@ -15,7 +15,7 @@ import { RAM_PAGES } from "../engine/types.js";
 const TABLE_ROW_HEIGHT = 22;
 const TABLE_VIEWPORT_HEIGHT = 330;
 const RAM_CELL_LIGHTNESS = 58;
-const TABLE_ROW_LIGHTNESS = 85;
+const TABLE_ROW_LIGHTNESS = 90;
 const DISK_ROW_OPACITY = "0.55";
 
 // Indicadores agrupados por fila; thrashing y fragmentacion se marcan aparte
@@ -51,9 +51,18 @@ const THRASHING_KEYS = ["thrashing_time", "thrashing_percent"];
 
 // Crea el panel de una MMU: barra de RAM, tabla de paginas e indicadores
 export function create_panel(title, algorithm_name) {
-  // Paso 1: encabezado del panel
-  const element = create_element("section", "panel");
-  element.appendChild(create_element("h2", "panel_title", title));
+  // Paso 1: encabezado del panel con una etiqueta que distingue a OPT del algoritmo elegido
+  const element = create_element("section", "panel card");
+  const panel_header = create_element("div", "panel_header");
+  panel_header.appendChild(create_element("h2", "panel_title", title));
+  if (algorithm_name === "OPT") {
+    element.classList.add("panel_opt");
+    panel_header.appendChild(create_element("span", "panel_tag", "Referencia óptima"));
+  } else {
+    element.classList.add("panel_selected");
+    panel_header.appendChild(create_element("span", "panel_tag", "Algoritmo elegido"));
+  }
+  element.appendChild(panel_header);
 
   // Paso 2: barra de RAM con una celda por marco
   const ram_bar = create_element("div", "ram_bar");
@@ -87,6 +96,7 @@ export function create_panel(title, algorithm_name) {
     viewport_height: TABLE_VIEWPORT_HEIGHT,
     get_cells: get_cells_for_row,
     get_row_style: get_style_for_row,
+    empty_text: "No hay páginas en memoria ni en disco.",
   });
   element.appendChild(create_element("h3", "section_title", "MMU"));
   element.appendChild(table.element);

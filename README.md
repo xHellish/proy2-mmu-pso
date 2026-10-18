@@ -2,7 +2,7 @@
 
 Simulador de paginación de memoria para el Proyecto 2 de Sistemas Operativos. Compara el algoritmo óptimo (OPT) contra FIFO, Second Chance (SC), LRU o LFU sobre la misma secuencia de operaciones.
 
-> Estado: en desarrollo. Ya funcionan el motor (parser, generador con semilla, MMU y los cinco algoritmos) y la interfaz de simulación. Faltan el despliegue y el informe.
+> Estado: el motor (parser, generador con semilla, MMU y los cinco algoritmos) y la interfaz están completos. Falta publicar el sitio.
 
 ## Stack
 
@@ -75,7 +75,7 @@ El servidor publica solo la carpeta `src/`. El resto del proyecto (tests, ejempl
 
 ## Formato del archivo de operaciones
 
-Una operación por línea (o separadas por comas). Los punteros se numeran por orden de aparición de cada `new`.
+Una operación por línea (también se aceptan separadas por comas o punto y coma). Los punteros se numeran por orden de aparición de cada `new`. Un `new` de más de 400 KB crea todas las páginas necesarias; las que no caben en RAM quedan en disco.
 
 ```
 new(1,500)

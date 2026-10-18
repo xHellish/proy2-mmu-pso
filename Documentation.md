@@ -65,7 +65,8 @@ El navegador pide el JavaScript como módulos ES, así que el servidor debe resp
 
 - **Preparación**: semilla, algoritmo (FIFO, SC, LRU, LFU), P, N y archivo opcional. Con un archivo cargado se ignoran semilla, P y N, y se avisa de cualquier error del archivo antes de iniciar. "Descargar archivo" baja el archivo generado en el formato del Anexo 1.
 - **Simulación**: dos paneles lado a lado, OPT a la izquierda. Cada panel tiene la barra de RAM de 100 celdas coloreadas por PID, la tabla de la MMU (PAGE ID, PID, LOADED, L-ADDR, M-ADDR, D-ADDR, LOADED-T, MARK) y los indicadores del enunciado, más hits y fallos.
-- **Controles**: Pausar/Reanudar, Paso, Ir al final y velocidad (1 a 2000 operaciones por segundo). Al terminar, el mensaje explica por qué la memoria quedó vacía: el generador termina cada proceso con `kill`.
+- **Controles**: Pausar/Reanudar, Paso, Ir al final y velocidad (1 a 2000 operaciones por segundo). Una insignia indica si la simulación está en ejecución, en pausa o terminada. Al terminar, una nota explica por qué la memoria quedó vacía: el generador termina cada proceso con `kill`.
+- **Estilo**: tema claro con encabezado común, tarjetas y una franja de color por panel (verde para OPT, azul para el algoritmo elegido). Los íconos de los botones son SVG en línea, para no depender de las fuentes del sistema.
 - **URL**: se puede abrir un escenario repetible con `?seed=1&algorithm=LRU&p=10&n=500&autostart=1`. Sirve para repetir una corrida o tomar las capturas del informe.
 
 ### MMU
@@ -121,6 +122,20 @@ HTML y CSS planos, JavaScript nativo en el navegador y Express como único servi
 - Entrega técnica (Fase 7) e informe (Fase 8).
 
 ## Decision Log
+
+### 2026-10-18 - Rediseño visual y controles estables
+
+- La interfaz pasa a un tema claro con encabezado, tarjetas, insignia de estado y botones con íconos SVG. Se mantienen los textos de los botones, las columnas del Anexo 2 y los indicadores.
+- El botón Pausar/Reanudar tiene ancho fijo. Antes, al cambiar el texto, desplazaba 21 px a Paso e Ir al final, justo cuando el usuario iba a pulsarlos.
+- La animación solo redibuja cuando avanzó alguna operación. A velocidades bajas evita reconstruir la tabla en cada cuadro.
+- La tabla muestra un mensaje cuando no hay páginas, en lugar de quedar en blanco al terminar.
+- Se verificó en Firefox: Pausar detiene el avance, Paso suma una operación, Reanudar continúa y Paso con la simulación en marcha la pausa.
+
+### 2026-10-18 - Respuestas del profesor sobre el archivo de pruebas
+
+- El profesor confirmó que un `new` de más de 400 KB debe crear todas las páginas necesarias. La MMU ya lo hacía con el autodesalojo; se agregó una prueba con un bloque de 1 MB (256 páginas: 100 en RAM y 156 en disco) para los cinco algoritmos.
+- El archivo de pruebas tendrá una operación por línea, sin comas. El lector conserva la tolerancia a comas y ahora acepta también `;` como separador, para no rechazar un archivo con otro formato.
+- Se mantiene el tope de 100 000 páginas por `ptr` (unos 400 MB): es mil veces la RAM y evita que un valor absurdo congele el navegador.
 
 ### 2026-10-14 - Express como servidor y simulación en el navegador
 
@@ -202,7 +217,7 @@ HTML y CSS planos, JavaScript nativo en el navegador y Express como único servi
 
 ### 2026-10-10 - Parser tolerante en el formato y estricto en las reglas
 
-- Formato tolerado: espacios, tabulaciones, líneas vacías, `\r\n`, BOM, mayúsculas, operaciones separadas por comas en una misma línea y comentarios `//` como los del enunciado.
+- Formato tolerado: espacios, tabulaciones, líneas vacías, `\r\n`, BOM, mayúsculas, operaciones separadas por comas (o, desde 2026-10-18, por punto y coma) en una misma línea y comentarios `//` como los del enunciado.
 - Cualquier otro texto en el archivo es un error explícito, para no ignorar en silencio una operación mal escrita.
 - Los `ptr` se numeran por orden de aparición de cada `new`, empezando en 1.
 - Modelo de operación: `{ type, pid, ptr, size }`. `new` trae su `ptr` asignado y `size`. `use` y `delete` traen el `pid` dueño, resuelto desde el `ptr`, porque el archivo no lo incluye. `kill` solo usa `pid`.

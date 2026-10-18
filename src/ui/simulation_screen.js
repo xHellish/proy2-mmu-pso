@@ -2,7 +2,7 @@
 // Imports
 // ---------------------------------------------
 
-import { create_element } from "./dom.js";
+import { create_element, create_icon } from "./dom.js";
 import { create_panel } from "./panel.js";
 import { create_simulator } from "../engine/simulator.js";
 
@@ -18,31 +18,56 @@ const DEFAULT_SPEED_INDEX = 3;
 const MAX_STEPS_PER_FRAME = 2000;
 
 // =============================================
+// Funciones auxiliares
+// ---------------------------------------------
+
+// Crea un boton de control con icono y texto
+function create_control_button(action, icon_name, label) {
+  const button = create_element("button", "control_button");
+  button.type = "button";
+  button.dataset.action = action;
+  button.appendChild(create_icon(icon_name));
+  button.appendChild(create_element("span", "button_label", label));
+  return button;
+}
+
+// =============================================
 // Pantalla de simulacion
 // ---------------------------------------------
 
 // Crea la pantalla de simulacion dentro de root_element; on_new_simulation vuelve a la preparacion
 export function create_simulation_screen(root_element, on_new_simulation) {
-  // Paso 1: barra de controles
-  const controls = create_element("div", "controls");
+  // Paso 1: barra de controles en tres filas: titulo y estado, botones y velocidad, progreso
+  const controls = create_element("div", "controls card");
   const title = create_element("strong", "sim_title", "");
   const description = create_element("span", "sim_description", "");
   const title_block = create_element("div", "title_block");
   title_block.appendChild(title);
   title_block.appendChild(description);
 
-  const pause_button = create_element("button", "", "Pausar");
-  pause_button.type = "button";
-  pause_button.dataset.action = "pause";
-  const step_button = create_element("button", "", "Paso");
-  step_button.type = "button";
-  step_button.dataset.action = "step";
-  const end_button = create_element("button", "", "Ir al final");
-  end_button.type = "button";
-  end_button.dataset.action = "end";
+  const status_badge = create_element("span", "status_badge", "");
+  status_badge.setAttribute("aria-live", "polite");
   const new_button = create_element("button", "secondary", "Nueva simulación");
   new_button.type = "button";
   new_button.dataset.action = "new";
+  const top_row = create_element("div", "controls_top");
+  top_row.appendChild(title_block);
+  top_row.appendChild(status_badge);
+  top_row.appendChild(new_button);
+
+  // Cada boton lleva un icono y un texto; el de pausa tiene ancho fijo para no mover a los demas
+  const pause_button = create_control_button("pause", "pause", "Pausar");
+  pause_button.classList.add("pause_button");
+  const pause_label = pause_button.querySelector(".button_label");
+  const step_button = create_control_button("step", "step", "Paso");
+  step_button.classList.add("secondary");
+  step_button.title = "Pausa y avanza una operación en ambas MMU";
+  const end_button = create_control_button("end", "end", "Ir al final");
+  end_button.classList.add("secondary");
+  const button_group = create_element("div", "button_group");
+  button_group.appendChild(pause_button);
+  button_group.appendChild(step_button);
+  button_group.appendChild(end_button);
 
   const speed_label = create_element("label", "speed");
   const speed_text = create_element("span", "speed_text", "");
@@ -51,9 +76,12 @@ export function create_simulation_screen(root_element, on_new_simulation) {
   speed_input.min = "0";
   speed_input.max = String(SPEEDS.length - 1);
   speed_input.value = String(DEFAULT_SPEED_INDEX);
-  speed_label.appendChild(create_element("span", "", "Velocidad"));
+  speed_label.appendChild(create_element("span", "speed_caption", "Velocidad"));
   speed_label.appendChild(speed_input);
   speed_label.appendChild(speed_text);
+  const main_row = create_element("div", "controls_main");
+  main_row.appendChild(button_group);
+  main_row.appendChild(speed_label);
 
   const progress = create_element("progress");
   progress.max = 1;
@@ -65,18 +93,14 @@ export function create_simulation_screen(root_element, on_new_simulation) {
   progress_block.appendChild(progress_text);
   progress_block.appendChild(last_operation_text);
 
-  const status = create_element("p", "status", "");
-  status.setAttribute("aria-live", "polite");
+  const status = create_element("p", "status_note", "");
+  status.hidden = true;
   const error_message = create_element("p", "error", "");
   error_message.setAttribute("role", "alert");
   error_message.hidden = true;
 
-  controls.appendChild(title_block);
-  controls.appendChild(pause_button);
-  controls.appendChild(step_button);
-  controls.appendChild(end_button);
-  controls.appendChild(speed_label);
-  controls.appendChild(new_button);
+  controls.appendChild(top_row);
+  controls.appendChild(main_row);
   controls.appendChild(progress_block);
   controls.appendChild(status);
   controls.appendChild(error_message);
@@ -98,29 +122,54 @@ export function create_simulation_screen(root_element, on_new_simulation) {
   // Dibujo
   // ---------------------------------------------
 
-  // Muestra el mensaje de estado segun la situacion actual
+  // Muestra el estado en la insignia y, al terminar, una nota que explica la memoria vacia
   function update_status(snapshot) {
+    // Paso 1: la insignia indica si corre, esta en pausa o termino
+    let state = "paused";
+    let label = "En pausa";
     if (snapshot.finished) {
-      status.textContent = `Terminada: ambas simulaciones procesaron las ${snapshot.total_operations} operaciones.`;
-      if (snapshot.selected.metrics.active_processes === 0) {
-        status.textContent += " Todos los procesos terminaron con kill, por eso la memoria quedó vacía.";
-      }
+      state = "finished";
+      label = "Terminada";
     } else if (running) {
-      status.textContent = "En ejecución";
-    } else {
-      status.textContent = "En pausa";
+      state = "running";
+      label = "En ejecución";
     }
+    if (status_badge.dataset.state !== state) {
+      status_badge.dataset.state = state;
+      status_badge.textContent = label;
+    }
+
+    // Paso 2: la nota solo aparece al terminar
+    if (!snapshot.finished) {
+      status.hidden = true;
+      return;
+    }
+    let note = `Ambas simulaciones procesaron las ${snapshot.total_operations} operaciones.`;
+    if (snapshot.selected.metrics.active_processes === 0) {
+      note += " Todos los procesos terminaron con kill, por eso la memoria quedó vacía.";
+    }
+    status.textContent = note;
+    status.hidden = false;
   }
 
-  // Habilita o deshabilita los botones segun si la simulacion termino
+  // Habilita o deshabilita los botones y cambia Pausar/Reanudar solo cuando cambia el estado
   function update_buttons(finished) {
     pause_button.disabled = finished;
     step_button.disabled = finished;
     end_button.disabled = finished;
+    let mode = "resume";
     if (running) {
-      pause_button.textContent = "Pausar";
-    } else {
-      pause_button.textContent = "Reanudar";
+      mode = "pause";
+    }
+    if (pause_button.dataset.mode !== mode) {
+      pause_button.dataset.mode = mode;
+      if (mode === "pause") {
+        pause_button.replaceChild(create_icon("pause"), pause_button.firstChild);
+        pause_label.textContent = "Pausar";
+      } else {
+        pause_button.replaceChild(create_icon("play"), pause_button.firstChild);
+        pause_label.textContent = "Reanudar";
+      }
     }
   }
 
@@ -201,13 +250,15 @@ export function create_simulation_screen(root_element, on_new_simulation) {
       return;
     }
 
-    // Paso 3: dibujar y seguir si no termino
+    // Paso 3: dibujar solo si avanzo alguna operacion, y seguir si no termino
     if (simulator.is_finished()) {
       running = false;
       render();
       return;
     }
-    render();
+    if (steps > 0) {
+      render();
+    }
     frame_id = requestAnimationFrame(animation_frame);
   }
 

@@ -7,31 +7,53 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <!-- Pantalla de preparacion -->
-    <section id="setup_screen" class="screen setup">
-      <h1>Simulador de MMU</h1>
-      <p class="subtitle">
-        Compara el algoritmo óptimo (OPT) contra un algoritmo de reemplazo de páginas sobre la
-        misma secuencia de operaciones.
-      </p>
-      <form id="setup_form">
-        <label for="seed_input">Semilla <input id="seed_input" type="text" inputmode="numeric" value="1" /></label>
-        <label for="algorithm_select">Algoritmo <select id="algorithm_select"></select></label>
-        <label for="process_count_select">Procesos (P) <select id="process_count_select"></select></label>
-        <label for="operation_count_select">Operaciones (N) <select id="operation_count_select"></select></label>
-        <label for="file_input">Archivo de operaciones (opcional) <input id="file_input" type="file" accept=".txt,text/plain" /></label>
-        <p id="file_status" class="hint"></p>
-        <button id="clear_file_button" type="button" class="secondary">Quitar archivo</button>
-        <p id="setup_error" class="error" role="alert" hidden></p>
-        <div class="actions">
-          <button id="download_button" type="button" class="secondary">Descargar archivo</button>
-          <button id="start_button" type="submit">Iniciar</button>
+    <!-- Encabezado comun a las dos pantallas -->
+    <header class="app_header">
+      <div class="brand">
+        <span class="brand_mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div>
+          <h1>Simulador de MMU</h1>
+          <p class="brand_subtitle">Paginación de memoria · OPT contra FIFO, SC, LRU y LFU</p>
         </div>
-      </form>
-    </section>
+      </div>
+      <p class="machine_info">RAM 400 KB · 100 páginas de 4 KB · acierto 1 s · fallo 5 s</p>
+    </header>
 
-    <!-- Pantalla de simulacion, se construye desde simulation_screen.js -->
-    <section id="simulation_screen" class="screen simulation" hidden></section>
+    <main class="app_main">
+      <!-- Pantalla de preparacion -->
+      <section id="setup_screen" class="screen setup">
+        <div class="card setup_card">
+          <h2 class="card_title">Nueva simulación</h2>
+          <p class="subtitle">
+            Compara el algoritmo óptimo (OPT) contra un algoritmo de reemplazo de páginas sobre la
+            misma secuencia de operaciones.
+          </p>
+          <form id="setup_form">
+            <div class="form_grid">
+              <label for="seed_input">Semilla <input id="seed_input" type="text" inputmode="numeric" value="1" /></label>
+              <label for="algorithm_select">Algoritmo <select id="algorithm_select"></select></label>
+              <label for="process_count_select">Procesos (P) <select id="process_count_select"></select></label>
+              <label for="operation_count_select">Operaciones (N) <select id="operation_count_select"></select></label>
+            </div>
+
+            <div class="file_box">
+              <label for="file_input">Archivo de operaciones (opcional) <input id="file_input" type="file" accept=".txt,text/plain" /></label>
+              <p id="file_status" class="hint"></p>
+              <button id="clear_file_button" type="button" class="secondary small">Quitar archivo</button>
+            </div>
+
+            <p id="setup_error" class="error" role="alert" hidden></p>
+            <div class="actions">
+              <button id="download_button" type="button" class="secondary">Descargar archivo</button>
+              <button id="start_button" type="submit">Iniciar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Pantalla de simulacion, se construye desde simulation_screen.js -->
+      <section id="simulation_screen" class="screen simulation" hidden></section>
+    </main>
 
     <script type="module" src="main.js"></script>
   </body>

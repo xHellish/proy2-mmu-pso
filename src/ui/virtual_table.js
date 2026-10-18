@@ -45,7 +45,7 @@ export function get_visible_range(scroll_top, viewport_height, row_height, row_c
 
 // Crea una tabla que solo dibuja las filas visibles, para soportar miles de paginas
 export function create_virtual_table(options) {
-  const { columns, row_height, viewport_height, get_cells, get_row_style } = options;
+  const { columns, row_height, viewport_height, get_cells, get_row_style, empty_text } = options;
 
   // Paso 1: estructura: un contenedor con scroll, un encabezado fijo y el contenido
   const element = create_element("div", "vtable");
@@ -63,8 +63,10 @@ export function create_virtual_table(options) {
   const content = create_element("div", "vcontent");
   const rows_layer = create_element("div", "vrows");
   content.appendChild(rows_layer);
+  const empty_message = create_element("p", "vempty", empty_text);
   body.appendChild(header);
   body.appendChild(content);
+  body.appendChild(empty_message);
   element.appendChild(body);
 
   let rows = [];
@@ -95,6 +97,7 @@ export function create_virtual_table(options) {
   function set_rows(new_rows) {
     rows = new_rows;
     content.style.height = `${rows.length * row_height}px`;
+    empty_message.hidden = rows.length > 0;
     render();
   }
 
