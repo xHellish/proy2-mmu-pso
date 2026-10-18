@@ -10,7 +10,7 @@ import { create_operation, OPERATION_TYPES, PAGE_SIZE_BYTES, MAX_PAGES_PER_PTR }
 
 const OPERATION_REGEX = /(new|use|delete|kill)\s*\(([^)]*)\)/gi;
 const COMMENT_REGEX = /\/\/[^\n\r]*/g;
-const SEPARATOR_REGEX = /[\s,]/g;
+const SEPARATOR_REGEX = /[\s,;]/g;
 const INTEGER_REGEX = /^\d+$/;
 
 // =============================================
@@ -61,7 +61,7 @@ export function parse_operations(text) {
   }
   const cleaned = text.replace(/^﻿/, "").replace(COMMENT_REGEX, "");
 
-  // Paso 2: rechazar cualquier texto que no sea una operacion, coma o espacio
+  // Paso 2: rechazar cualquier texto que no sea una operacion, coma, punto y coma o espacio
   const leftover = cleaned.replace(OPERATION_REGEX, "").replace(SEPARATOR_REGEX, "");
   if (leftover.length > 0) {
     throw new Error(`Texto inesperado en el archivo de operaciones: "${leftover.slice(0, 30)}"`);

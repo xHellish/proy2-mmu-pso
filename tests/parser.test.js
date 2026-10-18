@@ -64,6 +64,18 @@ test("accepts operations separated by commas on one line", () => {
   assert.equal(parse_operations(text).length, 3);
 });
 
+test("accepts operations ended with semicolons", () => {
+  const text = "new(1,500);\nuse(1); kill(1);";
+
+  assert.equal(parse_operations(text).length, 3);
+});
+
+test("accepts a size larger than the 400 KB of RAM", () => {
+  const operations = parse_operations("new(1,1048576)\nuse(1)\nkill(1)");
+
+  assert.equal(operations[0].size, 1048576);
+});
+
 test("accepts a file without final newline", () => {
   assert.equal(parse_operations("new(1,10)\nkill(1)").length, 2);
 });

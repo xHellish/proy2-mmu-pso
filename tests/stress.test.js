@@ -316,6 +316,29 @@ test("two processes with blocks larger than the RAM share it without errors", ()
   }
 });
 
+test("a 1 MB block creates all its pages and sends the ones that do not fit to disk", () => {
+  const operations = parse_operations("new(1,1048576)\nuse(1)\nkill(1)");
+  const needed_pages = Math.ceil(1048576 / PAGE_SIZE_BYTES);
+
+  for (const name of ALL_ALGORITHMS) {
+    // Paso 1: tras el new existen las 256 paginas, 100 en RAM y el resto en disco
+    const mmu = create_mmu(make_algorithm(name, operations));
+    mmu.execute(operations[0]);
+    const metrics = mmu.get_metrics();
+    assert.equal(mmu.get_pages().length, needed_pages, name);
+    assert.equal(metrics.loaded_pages, RAM_PAGES, name);
+    assert.equal(metrics.unloaded_pages, needed_pages - RAM_PAGES, name);
+    assert.equal(metrics.vram_percent, needed_pages - RAM_PAGES, name);
+    check_invariants(mmu, name);
+
+    // Paso 2: el use y el kill terminan sin errores y liberan todo
+    mmu.execute(operations[1]);
+    check_invariants(mmu, name);
+    mmu.execute(operations[2]);
+    assert.equal(mmu.get_pages().length, 0, name);
+  }
+});
+
 // =============================================
 // Archivos con formato irregular
 // ---------------------------------------------
