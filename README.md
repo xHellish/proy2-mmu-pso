@@ -2,7 +2,7 @@
 
 Simulador de paginación de memoria para el Proyecto 2 de Sistemas Operativos. Compara el algoritmo óptimo (OPT) contra FIFO, Second Chance (SC), LRU o LFU sobre la misma secuencia de operaciones.
 
-> Estado: el motor (parser, generador con semilla, MMU y los cinco algoritmos) y la interfaz están completos. Falta publicar el sitio.
+> Estado: el motor (parser, generador con semilla, MMU y los cinco algoritmos) y la interfaz están completos, y el sitio está publicado.
 
 ## Stack
 
@@ -38,6 +38,8 @@ npm test
 El puerto por defecto es 3000. Para cambiarlo: `PORT=8080 npm start`.
 
 ## Despliegue
+
+Sitio publicado: https://proy2-mmu-pso.onrender.com (Render, plan gratuito).
 
 El sitio se puede publicar en cualquier servicio que ejecute Node.js 18 o superior:
 
