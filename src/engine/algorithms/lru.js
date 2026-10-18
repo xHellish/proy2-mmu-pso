@@ -4,7 +4,7 @@
 
 // Crea el algoritmo LRU: desaloja la pagina con menor last_use (contador de accesos)
 export function create_lru_algorithm() {
-  // Contador de accesos propio: no usa el reloj para que dos accesos nunca empaten
+  // Contador de accesos propio: el orden de uso no depende de los costos de tiempo del modelo
   let access_counter = 0;
 
   // Marca la pagina como la mas recientemente usada

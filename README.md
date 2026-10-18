@@ -37,6 +37,20 @@ npm test
 
 El puerto por defecto es 3000. Para cambiarlo: `PORT=8080 npm start`.
 
+## Despliegue
+
+El sitio se puede publicar en cualquier servicio que ejecute Node.js 18 o superior:
+
+| Dato | Valor |
+|---|---|
+| Comando de instalación | `npm install` (o `npm ci`) |
+| Comando de inicio | `npm start` |
+| Puerto | El servicio lo define con la variable `PORT`; el servidor la lee solo |
+| Variables obligatorias | Ninguna |
+| Dirección de entrada | La raíz `/` redirige a `/ui/` conservando los parámetros de la URL |
+
+Un servicio gratuito puede suspender el sitio tras un rato sin visitas, y la primera carga después de eso tarda. Conviene abrir el sitio una vez antes de compartir la dirección.
+
 ## Uso
 
 1. Elige semilla, algoritmo, número de procesos (P) y de operaciones (N), o carga un archivo de operaciones. Con archivo se ignoran semilla, P y N.

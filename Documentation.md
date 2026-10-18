@@ -129,7 +129,7 @@ HTML y CSS planos, JavaScript nativo en el navegador y Express como único servi
 - Alternativa descartada: ejecutar el motor en el servidor y exponer una API. Duplicaría el estado por usuario y obligaría a reescribir la capa de simulación sin ganar nada.
 - Se publica únicamente `src/`. Es más seguro que servir la raíz del proyecto y mantiene las rutas de los módulos (`../engine/...`) intactas.
 - La raíz `/` redirige a `ui/` con ruta relativa, para que el sitio funcione también detrás de un prefijo de URL.
-- El servidor necesita Node 18 o superior, que es la versión de Debian 12, y se instala con `npm install`.
+- El servidor necesita Node 18 o superior y se instala con `npm install`.
 - Un sitio con Express necesita un host que ejecute Node. Un hosting de archivos estáticos como GitHub Pages no sirve para el servidor, aunque el contenido de `src/` sí funcionaría allí.
 - Se probó en Firefox 157: la raíz redirige con los parámetros, arranca la simulación, carga todos los módulos, y con P=100 y N=5000 llega al final en 160 ms.
 
@@ -181,7 +181,7 @@ HTML y CSS planos, JavaScript nativo en el navegador y Express como único servi
 - SC lleva una cola propia y no modifica `loaded_at`, para que LOADED-T siga mostrando el instante real de carga. Al salir de RAM la página deja la cola y su bit vuelve a 0.
 - SC lanza un error explícito si su cola no coincide con las páginas en RAM, en vez de decidir con datos inconsistentes.
 - Consecuencia: con todas las páginas recién cargadas (bit 1), el primer desalojo de SC se comporta como FIFO. Se diferencia cuando hay accesos entre desalojos.
-- LRU usa un contador de accesos propio y no el reloj, porque un `new` de varias páginas avanza el reloj de a 5 s pero un contador nunca empata.
+- LRU usa un contador de accesos propio y no el reloj, para que el orden de uso no dependa de los costos de tiempo del modelo (1 s por acierto y 5 s por fallo).
 - OPT mide la distancia por página (ver la entrada de la Fase 6). Todo empate se resuelve como FIFO.
 - OPT necesita que la MMU ejecute las operaciones en orden desde el índice 0, porque compara `operation_index` con las posiciones de la lista que recibió al crearse.
 - Un `ptr` que se borra antes de volver a usarse no necesita caso aparte: la validación del parser impide un `use` posterior, así que ya no tiene usos futuros.
